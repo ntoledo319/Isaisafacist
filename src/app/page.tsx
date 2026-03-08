@@ -1,5 +1,3 @@
-import { evidence01, evidence02, evidence03 } from './evidenceData';
-
 export default function Home() {
   return (
     <main className="min-h-screen bg-bone">
@@ -72,9 +70,11 @@ export default function Home() {
             <div className="evidence-label mb-2">EXHIBIT A — PRIMARY SUBJECT IDENTIFICATION</div>
             <div className="relative">
               <img
-                src={evidence01}
+                src="/images/evidence01.jpg"
                 alt="Primary subject identification — classified evidence photograph"
                 className="w-full block"
+                loading="lazy"
+                decoding="async"
               />
               {/* Crayon circle overlay */}
               <div
@@ -190,9 +190,11 @@ export default function Home() {
               <div className="evidence-label mb-2">EXHIBIT B — SUBJECT IN ACTIVE DOCTRINAL DISSEMINATION</div>
               <div className="relative">
                 <img
-                  src={evidence02}
+                  src="/images/evidence02.jpg"
                   alt="Subject observed during active doctrinal dissemination"
                   className="w-full block"
+                  loading="lazy"
+                  decoding="async"
                 />
                 {/* Annotation */}
                 <div
@@ -444,9 +446,11 @@ export default function Home() {
               <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
               <div className="relative">
                 <img
-                  src={evidence03}
+                  src="/images/evidence03.jpg"
                   alt="Final-stage observation — subject in contemplative state"
                   className="w-full block"
+                  loading="lazy"
+                  decoding="async"
                 />
                 {/* Crayon arrow */}
                 <div
