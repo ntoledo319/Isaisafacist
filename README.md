@@ -57,11 +57,12 @@ npx wrangler pages deploy out/ --project-name=isaisafacist
 ```
 ├── public/
 │   └── images/
-│       ├── evidence-01.svg   # Hero / primary identification
-│       ├── evidence-02.svg   # Doctrine / active dissemination
-│       └── evidence-03.svg   # Inevitability / final observation
+│       ├── evidence-01.svg   # Placeholder asset (not used by page)
+│       ├── evidence-02.svg   # Placeholder asset (not used by page)
+│       └── evidence-03.svg   # Placeholder asset (not used by page)
 ├── src/
 │   └── app/
+│       ├── evidenceData.ts   # Embedded JPEG data URIs (text-only assets)
 │       ├── globals.css       # Tailwind + custom dossier styling
 │       ├── layout.tsx        # Root layout with metadata
 │       └── page.tsx          # The entire single-page site
