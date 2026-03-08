@@ -43,7 +43,7 @@ export default function Home() {
         </div>
 
         {/* MAIN TITLE */}
-        <h1 className="hero-title text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.85] tracking-tight text-ink mb-4 fade-in fade-in-delay-2">
+        <h1 className="hero-title text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-4 fade-in fade-in-delay-2">
           ISA-FACIST
         </h1>
 
