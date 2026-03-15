@@ -1,6 +1,191 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+
+function useScrollReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            entry.target.querySelectorAll('.stamp, .stamp-classified').forEach((stamp) => {
+              stamp.classList.add('stamp-visible');
+            });
+            entry.target.querySelectorAll('.marker-highlight').forEach((m) => {
+              m.classList.add('highlighted');
+            });
+            entry.target.querySelectorAll('.crayon-underline').forEach((c) => {
+              c.classList.add('revealed');
+            });
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
+    );
+
+    const revealEls = el.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .section-divider');
+    revealEls.forEach((child) => observer.observe(child));
+    if (el.classList.contains('reveal') || el.classList.contains('reveal-left') || el.classList.contains('reveal-right')) {
+      observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return ref;
+}
+
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrollTop = window.scrollY;
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          setProgress(docHeight > 0 ? scrollTop / docHeight : 0);
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return progress;
+}
+
+function useLiveTimestamp() {
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setTime(
+        now.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }) +
+          ' UTC' +
+          (now.getTimezoneOffset() <= 0 ? '+' : '-') +
+          String(Math.abs(Math.floor(now.getTimezoneOffset() / 60))).padStart(2, '0')
+      );
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return time;
+}
+
+const FLOATING_SYMBOLS = ['◉', '▲', '✕', '◆', '●', '■', '△', '○'];
+
+function FloatingSymbols() {
+  return (
+    <>
+      {FLOATING_SYMBOLS.map((sym, i) => (
+        <span
+          key={i}
+          className="floating-symbol"
+          style={{
+            left: `${10 + i * 11}%`,
+            top: `${15 + (i % 3) * 25}%`,
+            animationDelay: `${i * 0.8}s`,
+            animationDuration: `${5 + (i % 3) * 2}s`,
+            fontSize: `${0.8 + (i % 4) * 0.3}rem`,
+          }}
+          aria-hidden="true"
+        >
+          {sym}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function ScrollProgressBar() {
+  const progress = useScrollProgress();
+  return (
+    <div
+      className="scroll-progress"
+      style={{ transform: `scaleX(${progress})`, width: '100%' }}
+      aria-hidden="true"
+    />
+  );
+}
+
+function Barcode() {
+  const heights = [70, 90, 50, 100, 60, 85, 45, 100, 75, 55, 90, 40, 100, 65, 80, 50, 95, 70, 100, 55, 85, 45, 75, 100, 60, 90, 50, 80, 100, 70];
+  return (
+    <div className="barcode" aria-hidden="true">
+      {heights.map((h, i) => (
+        <div
+          key={i}
+          className="barcode-line"
+          style={{ height: `${h}%`, width: i % 5 === 0 ? '3px' : '1.5px' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ThreatMeter() {
+  return (
+    <div className="max-w-xs mx-auto mt-6 fade-in fade-in-delay-5">
+      <div className="flex justify-between mb-1">
+        <span className="font-mono text-[0.5rem] tracking-widest uppercase text-gray-bureau">THREAT LEVEL</span>
+        <span className="font-mono text-[0.5rem] tracking-widest uppercase text-blood font-bold">MAXIMUM</span>
+      </div>
+      <div className="w-full bg-ink/10 rounded-full h-[6px] overflow-hidden">
+        <div className="threat-meter-bar" />
+      </div>
+    </div>
+  );
+}
+
+function RedactedText({ children }: { children: string }) {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    const el = e.currentTarget;
+    if (!el.classList.contains('declassified')) {
+      el.classList.add('declassified');
+    }
+  }, []);
+
+  return (
+    <span className="redacted" onClick={handleClick} title="Click to declassify">
+      {children}
+    </span>
+  );
+}
+
 export default function Home() {
+  const heroRef = useScrollReveal();
+  const actIIRef = useScrollReveal();
+  const actIIIRef = useScrollReveal();
+  const actIVRef = useScrollReveal();
+  const actVRef = useScrollReveal();
+  const footerRef = useScrollReveal();
+  const timestamp = useLiveTimestamp();
+
   return (
     <main className="min-h-screen bg-bone">
+      {/* ---- GLOBAL OVERLAYS ---- */}
+      <ScrollProgressBar />
+      <div className="grain-overlay" aria-hidden="true" />
+      <div className="scanlines" aria-hidden="true" />
+
       {/* ============================================= */}
       {/* WARNING STRIPE TOP BAR */}
       {/* ============================================= */}
@@ -9,26 +194,44 @@ export default function Home() {
       {/* ============================================= */}
       {/* META HEADER BAR */}
       {/* ============================================= */}
-      <div className="bg-ink text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase">
+      <div className="bg-ink text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm bg-ink/95">
         <span>Classification: <span className="text-crayon-red font-bold">CULTURAL EMERGENCY</span></span>
-        <span className="blink">● LIVE THREAT</span>
+        <span className="flex items-center gap-2">
+          <span className="live-timestamp hidden sm:inline">{timestamp}</span>
+          <span className="pulse-dot" />
+          LIVE THREAT
+        </span>
       </div>
 
       {/* ============================================= */}
       {/* ACT I — HERO / NATIONAL CULTURAL THREAT BULLETIN */}
       {/* ============================================= */}
-      <section className="relative px-4 pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden">
+      <section ref={heroRef} className="relative px-4 pt-14 pb-20 md:pt-24 md:pb-28 overflow-hidden">
+        {/* CLASSIFIED watermark */}
+        <div className="classified-watermark" aria-hidden="true" />
+
+        {/* Floating symbols */}
+        <FloatingSymbols />
+
         {/* Registration marks */}
         <div className="registration-mark top-4 left-4" aria-hidden="true" />
         <div className="registration-mark top-4 right-4" aria-hidden="true" />
+        <div className="registration-mark bottom-4 left-4" aria-hidden="true" />
+        <div className="registration-mark bottom-4 right-4" aria-hidden="true" />
 
-        {/* File number */}
-        <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-gray-bureau mb-6 fade-in">
-          CASE FILE NO. ISA-2024-001 &nbsp;/&nbsp; THREAT LEVEL: <span className="text-blood font-bold">IMMINENT</span>
+        {/* Document crease */}
+        <div className="doc-crease top-[55%]" aria-hidden="true" />
+
+        {/* File number + barcode */}
+        <div className="flex items-center justify-between mb-8 fade-in relative z-10">
+          <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-gray-bureau">
+            CASE FILE NO. ISA-2024-001 &nbsp;/&nbsp; THREAT LEVEL: <span className="text-blood font-bold">IMMINENT</span>
+          </div>
+          <Barcode />
         </div>
 
         {/* Fake seal */}
-        <div className="flex justify-center mb-8 fade-in fade-in-delay-1">
+        <div className="flex justify-center mb-10 fade-in fade-in-delay-1 relative z-10">
           <div className="seal">
             <div className="text-center">
               <div className="font-mono text-[0.45rem] tracking-[0.15em] uppercase leading-tight font-bold">
@@ -42,13 +245,16 @@ export default function Home() {
           </div>
         </div>
 
-        {/* MAIN TITLE */}
-        <h1 className="hero-title text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-4 fade-in fade-in-delay-2">
+        {/* MAIN TITLE — GLITCH */}
+        <h1
+          className="hero-title glitch-text text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-6 fade-in fade-in-delay-2 relative z-10"
+          data-text="ISA-FACIST"
+        >
           ISA-FACIST
         </h1>
 
         {/* Subtitle */}
-        <div className="text-center mb-8 fade-in fade-in-delay-3">
+        <div className="text-center mb-10 fade-in fade-in-delay-3 relative z-10">
           <p className="font-headline text-xl md:text-3xl italic text-ink/80 max-w-xl mx-auto leading-snug">
             National Cultural Threat Bulletin
           </p>
@@ -58,22 +264,28 @@ export default function Home() {
         </div>
 
         {/* Stamp */}
-        <div className="flex justify-center mb-10 fade-in fade-in-delay-4">
-          <div className="stamp-classified">
+        <div className="flex justify-center mb-8 fade-in fade-in-delay-4 relative z-10">
+          <div className="stamp-classified stamp-visible">
             VERIFIED THREAT
           </div>
         </div>
 
+        {/* Threat meter */}
+        <ThreatMeter />
+
         {/* ---- IMAGE 1: HERO EVIDENCE ---- */}
-        <div className="max-w-md mx-auto mb-10">
-          <div className="evidence-frame">
+        <div className="max-w-md mx-auto mb-12 mt-12 reveal relative z-10">
+          <div className="evidence-frame relative">
+            <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
+            <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
+            <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
             <div className="evidence-label mb-2">EXHIBIT A — PRIMARY SUBJECT IDENTIFICATION</div>
             <div className="relative">
               <img
                 src="/images/evidence01.jpg"
                 alt="Primary subject identification — classified evidence photograph"
                 className="w-full block"
-                loading="lazy"
+                loading="eager"
                 decoding="async"
               />
               {/* Crayon circle overlay */}
@@ -93,7 +305,7 @@ export default function Home() {
             </div>
             <div className="mt-2 flex justify-between items-end">
               <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                DATE: CLASSIFIED &nbsp;/&nbsp; SOURCE: FIELD UNIT
+                DATE: <RedactedText>04/15/2024</RedactedText> &nbsp;/&nbsp; SOURCE: FIELD UNIT
               </span>
               <span className="stamp text-[0.5rem] py-0.5 px-2 border-2">
                 AUTH.
@@ -103,7 +315,7 @@ export default function Home() {
         </div>
 
         {/* Core warning copy */}
-        <div className="max-w-lg mx-auto text-center">
+        <div className="max-w-lg mx-auto text-center reveal delay-2 relative z-10">
           <p className="font-headline text-2xl md:text-3xl font-bold leading-tight text-ink mb-4">
             We cannot stop what is coming.<br />
             <span className="marker-highlight">We can only educate the public.</span>
@@ -114,25 +326,33 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Divider */}
+      {/* Angled divider into Act II */}
       <div className="section-divider mx-4" />
 
       {/* ============================================= */}
       {/* ACT II — WHAT IS ISA FASCISM? */}
       {/* ============================================= */}
-      <section className="px-4 py-16 md:py-24">
-        <div className="max-w-2xl mx-auto">
+      <section ref={actIIRef} className="px-4 py-16 md:py-24 relative">
+        {/* Classified watermark */}
+        <div className="classified-watermark" aria-hidden="true" />
+        {/* Coffee stain */}
+        <div className="coffee-stain" style={{ top: '8%', right: '5%' }} aria-hidden="true" />
+        <div className="coffee-stain coffee-stain-sm" style={{ bottom: '15%', left: '3%' }} aria-hidden="true" />
+
+        <div className="max-w-2xl mx-auto relative z-10">
           {/* Section metadata */}
-          <div className="dossier-tab mb-8">
+          <div className="dossier-tab mb-8 reveal">
             Section II &nbsp;/&nbsp; Threat Analysis &nbsp;/&nbsp; Page 2 of 6
           </div>
 
-          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-8">
+          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-8 reveal delay-1">
             What Is<br />
             <span className="text-blood font-display text-4xl md:text-6xl">Isa Fascism</span>?
           </h2>
 
-          <div className="bg-white border-l-4 border-ink p-6 md:p-8 mb-8 shadow-sm">
+          <div className="bg-white border-l-4 border-ink p-6 md:p-8 mb-8 shadow-sm reveal delay-2 relative">
+            {/* Document crease */}
+            <div className="doc-crease top-[45%]" aria-hidden="true" />
             <p className="font-body text-base md:text-lg leading-relaxed">
               <span className="font-bold">Isa Fascism</span> is a rapidly spreading social-political-aesthetic doctrine characterized by <span className="marker-highlight">emotional spectacle</span>, iced coffee enforcement, unstable scheduling policy, and <span className="marker-highlight">mandatory symbolic participation</span>.
             </p>
@@ -145,8 +365,8 @@ export default function Home() {
               { code: 'IF-002', text: 'Containment protocols failed almost immediately.' },
               { code: 'IF-003', text: 'Civilian understanding remains dangerously low.' },
               { code: 'IF-004', text: 'Exposure is now considered functionally unavoidable.' },
-            ].map((finding) => (
-              <div key={finding.code} className="flex items-start gap-3 py-3 border-b border-ink/10">
+            ].map((finding, i) => (
+              <div key={finding.code} className={`flex items-start gap-3 py-3 border-b border-ink/10 reveal delay-${i + 3}`}>
                 <span className="font-mono text-[0.6rem] font-bold tracking-widest text-blood bg-blood/10 px-2 py-1 shrink-0">
                   {finding.code}
                 </span>
@@ -157,7 +377,7 @@ export default function Home() {
             ))}
           </div>
 
-          <div className="text-center">
+          <div className="text-center reveal delay-7">
             <div className="stamp inline-block">
               ANALYSIS COMPLETE
             </div>
@@ -171,22 +391,29 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT III — RECOVERED DOCTRINES / EVIDENCE */}
       {/* ============================================= */}
-      <section className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
+      <section ref={actIIIRef} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
+        {/* Coffee stain */}
+        <div className="coffee-stain" style={{ top: '3%', left: '8%' }} aria-hidden="true" />
+        <div className="coffee-stain coffee-stain-sm" style={{ bottom: '20%', right: '6%' }} aria-hidden="true" />
+
         <div className="max-w-3xl mx-auto relative z-10">
-          <div className="dossier-tab mb-6">
+          <div className="dossier-tab mb-6 reveal">
             Section III &nbsp;/&nbsp; Recovered Doctrines &nbsp;/&nbsp; Evidence of Spread
           </div>
 
-          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-4">
-            Recovered Doctrinal<br />Fragments
+          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-4 reveal delay-1">
+            Recovered <span className="marker-highlight">Doctrinal</span><br />Fragments
           </h2>
-          <p className="font-mono text-[0.6rem] tracking-[0.2em] uppercase text-gray-bureau mb-10">
+          <p className="font-mono text-[0.6rem] tracking-[0.2em] uppercase text-gray-bureau mb-10 reveal delay-2">
             THE FOLLOWING MATERIALS WERE OBTAINED THROUGH FIELD SURVEILLANCE AND VOLUNTARY INFORMANT TESTIMONY
           </p>
 
           {/* ---- IMAGE 2: DOCTRINE EVIDENCE ---- */}
-          <div className="max-w-sm mx-auto mb-12">
-            <div className="evidence-frame" style={{ transform: 'rotate(1deg)' }}>
+          <div className="max-w-sm mx-auto mb-12 reveal-scale delay-3">
+            <div className="evidence-frame relative" style={{ transform: 'rotate(1deg)' }}>
+              <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
+              <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
+              <div className="evidence-tape evidence-tape-bl" aria-hidden="true" />
               <div className="evidence-label mb-2">EXHIBIT B — SUBJECT IN ACTIVE DOCTRINAL DISSEMINATION</div>
               <div className="relative">
                 <img
@@ -206,13 +433,13 @@ export default function Home() {
                 </div>
               </div>
               <div className="mt-2 font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                SURVEILLANCE FRAME &nbsp;/&nbsp; LOCATION: <span className="redacted">REDACTED</span> &nbsp;/&nbsp; CONTEXT: DOCTRINAL ADDRESS
+                SURVEILLANCE FRAME &nbsp;/&nbsp; LOCATION: <RedactedText>UNDISCLOSED</RedactedText> &nbsp;/&nbsp; CONTEXT: DOCTRINAL ADDRESS
               </div>
             </div>
           </div>
 
           {/* DOCTRINE CARDS */}
-          <div className="grid gap-4 md:grid-cols-2 mb-8">
+          <div className="grid gap-5 md:grid-cols-2 mb-10">
             {[
               {
                 id: 'DC-01',
@@ -262,9 +489,9 @@ export default function Home() {
                 text: 'National assemblies in the style of a sobriety countdown announced by category of pro-Isa action.',
                 level: 'CEREMONIAL',
               },
-            ].map((doctrine) => (
-              <div key={doctrine.id} className="doctrine-card">
-                <div className="flex items-center gap-2 mb-2">
+            ].map((doctrine, i) => (
+              <div key={doctrine.id} className={`doctrine-card reveal delay-${(i % 4) + 1}`}>
+                <div className="flex items-center gap-2 mb-3">
                   <span className="font-mono text-[0.55rem] font-bold tracking-widest text-white bg-ink px-2 py-0.5">
                     {doctrine.id}
                   </span>
@@ -272,13 +499,13 @@ export default function Home() {
                     [{doctrine.level}]
                   </span>
                 </div>
-                <h3 className="font-headline text-base font-bold mb-1">{doctrine.title}</h3>
+                <h3 className="font-headline text-base font-bold mb-1.5">{doctrine.title}</h3>
                 <p className="font-body text-sm text-ink/75 leading-relaxed">{doctrine.text}</p>
               </div>
             ))}
           </div>
 
-          <div className="text-center">
+          <div className="text-center reveal delay-5">
             <p className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-gray-bureau">
               ▲ END OF RECOVERED MATERIALS &nbsp;/&nbsp; FURTHER FRAGMENTS EXPECTED ▲
             </p>
@@ -286,32 +513,43 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Divider */}
-      <div className="section-divider mx-0 bg-blood" style={{ height: '3px' }} />
+      {/* Angled divider into pillars */}
+      <div className="angled-divider" aria-hidden="true" />
 
       {/* ============================================= */}
       {/* ACT IV — THE FIVE OPERATIONAL PILLARS */}
       {/* ============================================= */}
-      <section className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
-        {/* Subtle grid background */}
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-          aria-hidden="true"
-        />
+      <section ref={actIVRef} className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
+        {/* Grid bg replaced with dedicated class */}
+        <div className="footer-grid" aria-hidden="true" />
+
+        {/* Floating red symbols in the dark section */}
+        {['◉', '▲', '■', '○', '△'].map((sym, i) => (
+          <span
+            key={`pillar-sym-${i}`}
+            className="floating-symbol"
+            style={{
+              left: `${5 + i * 20}%`,
+              top: `${10 + (i % 3) * 30}%`,
+              animationDelay: `${i * 1.2}s`,
+              animationDuration: `${6 + i}s`,
+              color: 'rgba(196, 30, 30, 0.15)',
+            }}
+            aria-hidden="true"
+          >
+            {sym}
+          </span>
+        ))}
 
         <div className="max-w-3xl mx-auto relative z-10">
-          <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-white/40 mb-6">
+          <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-white/40 mb-6 reveal">
             Section IV &nbsp;/&nbsp; Foundational Architecture &nbsp;/&nbsp; CLASSIFIED
           </div>
 
-          <h2 className="font-headline text-3xl md:text-5xl lg:text-6xl font-black leading-[1.0] mb-4">
+          <h2 className="font-headline text-3xl md:text-5xl lg:text-6xl font-black leading-[1.0] mb-4 reveal delay-1">
             The Five<br />Operational Pillars
           </h2>
-          <p className="font-headline text-lg md:text-xl italic text-white/60 mb-12 md:mb-16">
+          <p className="font-headline text-lg md:text-xl italic text-white/60 mb-12 md:mb-16 reveal delay-2">
             of Isa Fascism
           </p>
 
@@ -344,11 +582,10 @@ export default function Home() {
                 note: 'Mandatory group processing sessions. No one leaves until everyone has cried at least once. Refreshments provided.',
               },
             ].map((pillar, i) => (
-              <div key={pillar.num} className="relative">
-                {/* Pillar number */}
+              <div key={pillar.num} className={`relative pillar-item reveal-left delay-${i + 1}`}>
                 <div className="flex items-start gap-4 md:gap-6">
                   <div className="shrink-0">
-                    <div className="w-12 h-12 md:w-16 md:h-16 border-2 border-blood bg-blood/10 flex items-center justify-center">
+                    <div className="pillar-num w-12 h-12 md:w-16 md:h-16 border-2 border-blood bg-blood/10 flex items-center justify-center">
                       <span className="font-headline text-xl md:text-2xl font-black text-blood">
                         {pillar.num}
                       </span>
@@ -363,7 +600,6 @@ export default function Home() {
                     </p>
                   </div>
                 </div>
-                {/* Separator line */}
                 {i < 4 && (
                   <div className="mt-6 md:mt-8 border-b border-white/10" />
                 )}
@@ -372,8 +608,8 @@ export default function Home() {
           </div>
 
           {/* Monumental close */}
-          <div className="mt-16 md:mt-20 text-center">
-            <div className="inline-block border-2 border-blood px-6 py-3">
+          <div className="mt-16 md:mt-20 text-center reveal-scale delay-6">
+            <div className="inline-block border-2 border-blood px-6 py-3 hover:bg-blood/10 transition-colors duration-300">
               <p className="font-mono text-[0.6rem] tracking-[0.3em] uppercase text-blood font-bold">
                 THESE PILLARS CANNOT BE REFORMED
               </p>
@@ -382,32 +618,44 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Angled divider reverse */}
+      <div className="angled-divider angled-divider-reverse" style={{ background: 'var(--color-bone)' }} aria-hidden="true">
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--color-bone)' }} />
+      </div>
+
       {/* Warning stripe */}
       <div className="warning-stripe h-3 w-full" aria-hidden="true" />
 
       {/* ============================================= */}
       {/* ACT V — INEVITABILITY / CIVILIAN PREPAREDNESS */}
       {/* ============================================= */}
-      <section className="px-4 py-16 md:py-24">
-        <div className="max-w-2xl mx-auto">
-          <div className="dossier-tab mb-6">
+      <section ref={actVRef} className="px-4 py-16 md:py-24 relative">
+        {/* Classified watermark */}
+        <div className="classified-watermark" aria-hidden="true" />
+        {/* Coffee stain */}
+        <div className="coffee-stain" style={{ bottom: '10%', right: '8%' }} aria-hidden="true" />
+
+        <div className="max-w-2xl mx-auto relative z-10">
+          <div className="dossier-tab mb-6 reveal">
             Section V &nbsp;/&nbsp; Civilian Preparedness Memo &nbsp;/&nbsp; FINAL ADVISORY
           </div>
 
-          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-6">
+          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-6 reveal delay-1">
             It Cannot<br />
             <span className="crayon-underline">Be Stopped.</span>
           </h2>
 
-          <div className="bg-white border-2 border-ink p-6 md:p-10 mb-10 relative">
+          <div className="bg-white border-2 border-ink p-6 md:p-10 mb-10 relative reveal delay-2">
             {/* Corner fold effect */}
             <div
-              className="absolute top-0 right-0 w-8 h-8 bg-bone"
+              className="absolute top-0 right-0 w-10 h-10 bg-bone"
               style={{
-                background: 'linear-gradient(225deg, var(--color-bone) 50%, #ccc 50%, #ddd 52%, white 52%)',
+                background: 'linear-gradient(225deg, var(--color-bone) 50%, #c5c0b8 50%, #d5d0c8 52%, white 52%)',
               }}
               aria-hidden="true"
             />
+            {/* Crease */}
+            <div className="doc-crease top-[50%]" aria-hidden="true" />
 
             <p className="font-headline text-xl md:text-2xl font-bold leading-snug mb-6">
               We can&rsquo;t actually stop this from happening. We can just educate on what&rsquo;s coming.
@@ -420,7 +668,7 @@ export default function Home() {
                 'Boundaries have failed.',
                 'At this stage, civilian awareness is the only remaining response.',
               ].map((line, i) => (
-                <div key={i} className="flex items-center gap-3">
+                <div key={i} className={`flex items-center gap-3 reveal delay-${i + 3}`}>
                   <span className="w-5 h-5 bg-blood text-white font-mono text-[0.5rem] font-bold flex items-center justify-center shrink-0">
                     ✕
                   </span>
@@ -441,8 +689,11 @@ export default function Home() {
           </div>
 
           {/* ---- IMAGE 3: FINAL EVIDENCE ---- */}
-          <div className="max-w-sm mx-auto mb-12">
-            <div className="evidence-frame" style={{ transform: 'rotate(-1.5deg)' }}>
+          <div className="max-w-sm mx-auto mb-12 reveal-scale delay-2">
+            <div className="evidence-frame relative" style={{ transform: 'rotate(-1.5deg)' }}>
+              <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
+              <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
+              <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
               <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
               <div className="relative">
                 <img
@@ -478,7 +729,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="text-center">
+          <div className="text-center reveal delay-4">
             <p className="font-headline text-lg md:text-xl italic text-ink/60">
               You have been informed.
             </p>
@@ -489,39 +740,62 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT VI — FOOTER / ISSUING BODY */}
       {/* ============================================= */}
-      <footer className="bg-ink text-white px-4 py-16 md:py-24">
-        <div className="max-w-lg mx-auto text-center">
-          {/* Seal */}
-          <div className="flex justify-center mb-8">
-            <div className="w-20 h-20 md:w-24 md:h-24 border-2 border-white/30 rounded-full flex items-center justify-center relative">
-              <div className="absolute inset-[4px] border border-white/20 rounded-full" />
-              <div className="absolute inset-[8px] border border-white/10 rounded-full" />
+      <footer ref={footerRef} className="bg-ink text-white px-4 py-20 md:py-28 relative overflow-hidden">
+        {/* Grid lines */}
+        <div className="footer-grid" aria-hidden="true" />
+
+        <div className="max-w-lg mx-auto text-center relative z-10">
+          {/* Seal — larger */}
+          <div className="flex justify-center mb-10 reveal-scale">
+            <div className="w-24 h-24 md:w-32 md:h-32 border-2 border-white/30 rounded-full flex items-center justify-center relative">
+              <div className="absolute inset-[4px] border border-white/20 rounded-full footer-seal-ring" style={{ borderStyle: 'dashed' }} />
+              <div className="absolute inset-[10px] border border-white/10 rounded-full" />
               <div className="text-center">
-                <div className="text-lg md:text-xl">◉</div>
+                <div className="font-mono text-[0.35rem] md:text-[0.4rem] tracking-[0.1em] uppercase text-white/40 font-bold mb-0.5">AGNOSTIC</div>
+                <div className="text-xl md:text-2xl">◉</div>
+                <div className="font-mono text-[0.35rem] md:text-[0.4rem] tracking-[0.1em] uppercase text-white/40">SOCIETY</div>
               </div>
             </div>
           </div>
 
-          <div className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-white/40 mb-4">
+          <div className="font-mono text-[0.6rem] tracking-[0.15em] uppercase text-white/40 mb-4 reveal delay-1">
             THIS DOCUMENT CONSTITUTES OFFICIAL PUBLIC NOTICE
           </div>
 
-          <div className="w-16 h-px bg-white/20 mx-auto mb-6" />
+          <div className="w-20 h-px bg-white/20 mx-auto mb-6" />
 
-          <p className="font-headline text-base md:text-lg italic text-white/70 mb-2">
+          <p className="font-headline text-base md:text-lg italic text-white/70 mb-2 reveal delay-2">
             &mdash; The Agnostic Society for the Study of Isa Fascism
           </p>
 
-          <p className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-white/25 mt-8">
+          <p className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-white/25 mt-8 reveal delay-3">
             DOCUMENT REF: ISA-FACIST-2024-BULLETIN-001 &nbsp;/&nbsp; DISTRIBUTION: UNRESTRICTED
           </p>
 
-          <div className="mt-10 pt-6 border-t border-white/10">
-            <p className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-white/20">
+          {/* Live access timestamp */}
+          <div className="mt-6 reveal delay-3">
+            <p className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-white/30">
+              DOCUMENT ACCESSED: <span className="live-timestamp text-blood/60">{timestamp}</span>
+            </p>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-white/10 reveal delay-4">
+            <p className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-white/20 leading-relaxed">
               THIS IS SATIRE. THIS IS PARODY. THIS IS ART. THIS IS ABSURDIST SOCIAL COMMENTARY.<br />
               NO ACTUAL GOVERNMENTS, AGENCIES, OR FASCISMS WERE HARMED IN THE MAKING OF THIS DOCUMENT.<br />
               EXCEPT MAYBE FACISM. BECAUSE IT&rsquo;S SPELLED WRONG ON PURPOSE.
             </p>
+          </div>
+
+          {/* Return to top */}
+          <div className="mt-8 reveal delay-5">
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="font-mono text-[0.55rem] tracking-[0.2em] uppercase text-white/25 hover:text-blood transition-colors duration-300 cursor-pointer"
+              aria-label="Return to top of document"
+            >
+              ▲ RETURN TO TOP ▲
+            </button>
           </div>
         </div>
       </footer>

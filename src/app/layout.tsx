@@ -1,5 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#1a1a1a',
+};
 
 export const metadata: Metadata = {
   title: "ISA-FACIST — National Cultural Threat Bulletin",
