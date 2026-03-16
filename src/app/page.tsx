@@ -248,9 +248,9 @@ export default function Home() {
         {/* MAIN TITLE — GLITCH */}
         <h1
           className="hero-title glitch-text text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-6 fade-in fade-in-delay-2 relative z-10"
-          data-text="ISA-FACIST"
+          data-text="ISA-FASCIST"
         >
-          ISA-FACIST
+          ISA-FASCIST
         </h1>
 
         {/* Subtitle */}
@@ -558,12 +558,12 @@ export default function Home() {
             {[
               {
                 num: 'I',
-                title: 'FACISM',
-                note: 'The core doctrine. Deliberately misspelled. Unfixable by design. It is not a typo. It is a worldview.',
+                title: 'FASCISM',
+                note: 'The core doctrine. Unavoidable by design. It is not a phase. It is a worldview.',
               },
               {
                 num: 'II',
-                title: 'THEIFTING',
+                title: 'THRIFTING',
                 note: 'Secondhand acquisition as political praxis. Every garment is a manifesto. Every price tag is propaganda.',
               },
               {
@@ -769,7 +769,7 @@ export default function Home() {
           </p>
 
           <p className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-white/25 mt-8 reveal delay-3">
-            DOCUMENT REF: ISA-FACIST-2024-BULLETIN-001 &nbsp;/&nbsp; DISTRIBUTION: UNRESTRICTED
+            DOCUMENT REF: ISA-FASCIST-2024-BULLETIN-001 &nbsp;/&nbsp; DISTRIBUTION: UNRESTRICTED
           </p>
 
           {/* Live access timestamp */}
@@ -783,7 +783,7 @@ export default function Home() {
             <p className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-white/20 leading-relaxed">
               THIS IS SATIRE. THIS IS PARODY. THIS IS ART. THIS IS ABSURDIST SOCIAL COMMENTARY.<br />
               NO ACTUAL GOVERNMENTS, AGENCIES, OR FASCISMS WERE HARMED IN THE MAKING OF THIS DOCUMENT.<br />
-              EXCEPT MAYBE FACISM. BECAUSE IT&rsquo;S SPELLED WRONG ON PURPOSE.
+              EXCEPT MAYBE FASCISM. BUT THAT&rsquo;S THE POINT.
             </p>
           </div>
 

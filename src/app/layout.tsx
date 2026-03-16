@@ -8,10 +8,10 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "ISA-FACIST — National Cultural Threat Bulletin",
+  title: "ISA-FASCIST — National Cultural Threat Bulletin",
   description: "A public awareness initiative issued in reluctant service by the Agnostic Society for the Study of Isa Fascism.",
   openGraph: {
-    title: "ISA IS A FACIST",
+    title: "ISA IS A FASCIST",
     description: "We cannot stop what is coming. We can only educate the public.",
     siteName: "isaisafacist.club",
     type: "website",
