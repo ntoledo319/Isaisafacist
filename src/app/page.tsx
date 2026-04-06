@@ -438,6 +438,211 @@ function KonamiLockdown({ active, onDismiss }: { active: boolean; onDismiss: () 
   );
 }
 
+/** Three-Card Monte — hidden game triggered by clicking the final evidence photo.
+ *  3 card objects (key = card identity) each assigned a slot (0/1/2).
+ *  React key stays on the card, so the DOM node persists across slot changes,
+ *  and CSS transition on `transform: translateX()` animates the movement. */
+function ThreeCardMonte({ onClose }: { onClose: () => void }) {
+  type Phase = 'intro' | 'reveal' | 'shuffling' | 'picking' | 'result';
+  const [phase, setPhase] = useState<Phase>('intro');
+  // cardSlots[cardId] = which slot (0,1,2) that card occupies
+  const [cardSlots, setCardSlots] = useState<[number, number, number]>([0, 1, 2]);
+  const [picked, setPicked] = useState<number | null>(null); // slot index the user clicked
+  const [won, setWon] = useState(false);
+  const [showFaces, setShowFaces] = useState(false);
+  const alive = useRef(true);
+
+  // Card 0 is always Isa. Cards 1 and 2 are decoys.
+  const ISA = 0;
+
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  const [slotWidth, setSlotWidth] = useState(112);
+  useEffect(() => {
+    const update = () => setSlotWidth(window.innerWidth >= 640 ? 140 : 112);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const getSlotX = useCallback((slot: number) => slot * slotWidth, [slotWidth]);
+
+  const startGame = useCallback(async () => {
+    alive.current = true;
+
+    // Random initial placement for Isa
+    const isaSlot = Math.floor(Math.random() * 3);
+    const decoySlots = [0, 1, 2].filter(s => s !== isaSlot);
+    const init: [number, number, number] = [isaSlot, decoySlots[0], decoySlots[1]];
+    setCardSlots(init);
+    setPicked(null);
+    setWon(false);
+
+    // Show faces
+    setPhase('reveal');
+    setShowFaces(true);
+    await sleep(2200);
+    if (!alive.current) return;
+
+    // Flip back down
+    setShowFaces(false);
+    await sleep(700);
+    if (!alive.current) return;
+
+    // Shuffle: 6-9 swaps
+    setPhase('shuffling');
+    const numSwaps = 6 + Math.floor(Math.random() * 4);
+    const cur: [number, number, number] = [...init];
+
+    for (let i = 0; i < numSwaps; i++) {
+      if (!alive.current) return;
+      // Pick two cards to swap slots
+      const a = Math.floor(Math.random() * 3);
+      let b = a;
+      while (b === a) b = Math.floor(Math.random() * 3);
+      const tmp = cur[a]; cur[a] = cur[b]; cur[b] = tmp;
+      setCardSlots([...cur]);
+      await sleep(Math.max(280, 520 - i * 30));
+    }
+
+    // Rig: 75% chance we do one extra swap moving Isa to confuse
+    if (Math.random() > 0.25) {
+      if (!alive.current) return;
+      const isaAt = cur[ISA];
+      const others = [0, 1, 2].filter(s => s !== isaAt);
+      const target = others[Math.floor(Math.random() * others.length)];
+      // Find which card is at target slot
+      const otherCard = cur.indexOf(target);
+      const tmp = cur[ISA]; cur[ISA] = cur[otherCard]; cur[otherCard] = tmp;
+      setCardSlots([...cur]);
+      await sleep(380);
+    }
+
+    if (!alive.current) return;
+    setPhase('picking');
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'intro') {
+      const t = setTimeout(startGame, 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase, startGame]);
+
+  useEffect(() => () => { alive.current = false; }, []);
+
+  const handlePick = useCallback((slot: number) => {
+    if (phase !== 'picking') return;
+    setPicked(slot);
+    setWon(cardSlots[ISA] === slot);
+    setShowFaces(true);
+    setPhase('result');
+  }, [phase, cardSlots]);
+
+  // Which slot did the user click? We need to map pointer position back to slot.
+  // Simpler: render a transparent click target for each slot.
+
+  return (
+    <div className="monte-game">
+      <div className="text-center mb-4">
+        <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-gray-bureau mb-1">
+          CLASSIFIED — EVIDENCE SHUFFLE PROTOCOL
+        </div>
+        <div className="font-headline text-base md:text-xl font-bold text-ink leading-snug">
+          {phase === 'intro' && 'Initializing shuffle protocol...'}
+          {phase === 'reveal' && 'Observe. Remember the subject.'}
+          {phase === 'shuffling' && 'Tracking in progress...'}
+          {phase === 'picking' && 'Select a card, agent.'}
+          {phase === 'result' && (won ? 'Congratulations, Isa wins!' : 'Congratulations, you win nothing!')}
+        </div>
+      </div>
+
+      {/* Card table — relative container, cards absolutely positioned */}
+      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 168 : 140 }}>
+        {[0, 1, 2].map((cardId) => {
+          const slot = cardSlots[cardId];
+          const isFlipped = showFaces;
+          const isIsa = cardId === ISA;
+          const isPickedSlot = picked === slot;
+          const isPickable = phase === 'picking';
+
+          return (
+            <div
+              key={`card-${cardId}`}
+              className={`monte-card absolute top-0 ${isFlipped ? 'flipped' : ''}`}
+              style={{
+                left: 0,
+                transform: `translateX(${getSlotX(slot)}px)${isFlipped ? ' rotateY(180deg)' : ''}`,
+                transition: phase === 'shuffling'
+                  ? 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : 'transform 0.5s ease',
+                outline: phase === 'result' && isPickedSlot
+                  ? `3px solid ${won ? 'var(--color-blood)' : 'var(--color-gray-bureau)'}`
+                  : 'none',
+                outlineOffset: '3px',
+                zIndex: phase === 'result' && isPickedSlot ? 2 : 1,
+                cursor: isPickable ? 'pointer' : 'default',
+              }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                handlePick(slot);
+              }}
+              role={isPickable ? 'button' : undefined}
+              tabIndex={isPickable ? 0 : undefined}
+              aria-label={isPickable ? `Select card ${slot + 1}` : undefined}
+            >
+              {/* Back */}
+              <div className="monte-card-face monte-card-back">
+                <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/40 z-10">CLASSIFIED</div>
+                <div className="text-white/20 text-2xl my-2 z-10">◆</div>
+                <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-white/20 z-10">ISA-2024</div>
+              </div>
+              {/* Front */}
+              {isIsa ? (
+                <div className="monte-card-face monte-card-front">
+                  <img src="/images/evidence03.jpg" alt="Subject ISA" />
+                </div>
+              ) : (
+                <div className="monte-card-face monte-card-front bg-paper flex flex-col items-center justify-center p-3">
+                  <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-gray-bureau mb-1">
+                    {cardId === 1 ? 'EXHIBIT X-7' : 'EXHIBIT X-9'}
+                  </div>
+                  <div className="text-3xl mb-1 opacity-30">◉</div>
+                  <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-ink/30">DECOY FILE</div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {phase === 'result' && (
+        <div className="monte-result mt-6">
+          <div className={`font-mono text-[0.55rem] tracking-[0.2em] uppercase mb-4 ${won ? 'monte-result-win font-bold' : 'monte-result-lose'}`}>
+            {won
+              ? '▲ SUBJECT LOCATED — ISA WINS AGAIN ▲'
+              : '▲ SURVEILLANCE FAILURE — SUBJECT REMAINS AT LARGE ▲'}
+          </div>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => setPhase('intro')}
+              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink px-4 py-2 hover:bg-ink hover:text-white transition-colors duration-200 cursor-pointer"
+            >
+              SHUFFLE AGAIN
+            </button>
+            <button
+              onClick={onClose}
+              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink/30 text-ink/50 px-4 py-2 hover:border-ink hover:text-ink transition-colors duration-200 cursor-pointer"
+            >
+              RETURN TO FILE
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* Doctrine card stamp variations — different analysts handled different cards */
 const DOCTRINE_STAMPS = [
   'CONFIRMED',
@@ -466,6 +671,7 @@ export default function Home() {
   const splash = useSplashScreen();
   const scrollProgress = useScrollProgress();
   const konami = useKonamiCode();
+  const [monteActive, setMonteActive] = useState(false);
 
   return (
     <main className="min-h-screen bg-bone">
@@ -1054,46 +1260,63 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ---- IMAGE 3: FINAL EVIDENCE ---- */}
-          <div className="max-w-sm mx-auto mb-12 reveal-scale delay-2">
-            <div className="evidence-frame relative" style={{ transform: 'rotate(-1.5deg)' }}>
-              <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
-              <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
-              <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
-              <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
-              <div className="relative">
-                <img
-                  src="/images/evidence03.jpg"
-                  alt="Final-stage observation — subject in contemplative state"
-                  className="w-full block"
-                  loading="lazy"
-                  decoding="async"
-                />
-                {/* Crayon arrow */}
-                <div
-                  className="absolute top-[5%] left-[5%] font-mono text-[0.55rem] text-crayon-red font-bold"
-                  style={{ transform: 'rotate(-8deg)' }}
-                  aria-hidden="true"
-                >
-                  IT&rsquo;S TOO LATE ↓
+          {/* ---- IMAGE 3: FINAL EVIDENCE / THREE-CARD MONTE ---- */}
+          {!monteActive ? (
+            <div className="max-w-sm mx-auto mb-12 reveal-scale delay-2">
+              <div
+                className="evidence-frame evidence-glow relative"
+                style={{ transform: 'rotate(-1.5deg)' }}
+                onClick={() => setMonteActive(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setMonteActive(true); }}
+                aria-label="Open evidence shuffle protocol"
+              >
+                <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
+                <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
+                <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
+                <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
+                <div className="relative">
+                  <img
+                    src="/images/evidence03.jpg"
+                    alt="Final-stage observation — subject in contemplative state"
+                    className="w-full block"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {/* Crayon arrow */}
+                  <div
+                    className="absolute top-[5%] left-[5%] font-mono text-[0.55rem] text-crayon-red font-bold"
+                    style={{ transform: 'rotate(-8deg)' }}
+                    aria-hidden="true"
+                  >
+                    IT&rsquo;S TOO LATE ↓
+                  </div>
+                  {/* Evidence circle */}
+                  <div
+                    className="absolute bottom-[20%] left-[25%] w-[50%] h-[30%] border-[3px] border-crayon-blue rounded-[45%_50%_52%_48%] opacity-50 pointer-events-none"
+                    style={{ transform: 'rotate(4deg)' }}
+                    aria-hidden="true"
+                  />
                 </div>
-                {/* Evidence circle */}
-                <div
-                  className="absolute bottom-[20%] left-[25%] w-[50%] h-[30%] border-[3px] border-crayon-blue rounded-[45%_50%_52%_48%] opacity-50 pointer-events-none"
-                  style={{ transform: 'rotate(4deg)' }}
-                  aria-hidden="true"
-                />
-              </div>
-              <div className="mt-2 flex justify-between items-end">
-                <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                  STATUS: <span className="text-blood font-bold">IRREVERSIBLE</span> &nbsp;/&nbsp; REF: ISA-FINAL
-                </span>
-                <span className="stamp text-[0.5rem] py-0.5 px-2 border-2" style={{ transform: 'rotate(-8deg)' }}>
-                  NO RETURN
-                </span>
+                <div className="mt-2 flex justify-between items-end">
+                  <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
+                    STATUS: <span className="text-blood font-bold">IRREVERSIBLE</span> &nbsp;/&nbsp; REF: ISA-FINAL
+                  </span>
+                  <span className="stamp text-[0.5rem] py-0.5 px-2 border-2" style={{ transform: 'rotate(-8deg)' }}>
+                    NO RETURN
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="max-w-md mx-auto mb-12 reveal-scale">
+              <div className="bg-white border-2 border-ink p-4 md:p-6 relative">
+                <div className="doc-crease top-[30%]" aria-hidden="true" />
+                <ThreeCardMonte onClose={() => setMonteActive(false)} />
+              </div>
+            </div>
+          )}
 
           {/* Analyst transfer request */}
           <div className="mt-8 bg-paper border border-ink/20 p-4 reveal delay-4 relative">
