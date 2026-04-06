@@ -165,11 +165,16 @@ function useInactivityWarning() {
   return idle;
 }
 
-/** Splash screen — classified folder opening animation */
+/** Splash screen — classified folder opening animation, click to skip */
 function useSplashScreen() {
   const [visible, setVisible] = useState(true);
   const [opening, setOpening] = useState(false);
   const [stampVisible, setStampVisible] = useState(false);
+
+  const skip = useCallback(() => {
+    setOpening(true);
+    setTimeout(() => setVisible(false), 600);
+  }, []);
 
   useEffect(() => {
     const stampTimer = setTimeout(() => setStampVisible(true), 600);
@@ -178,7 +183,7 @@ function useSplashScreen() {
     return () => { clearTimeout(stampTimer); clearTimeout(openTimer); clearTimeout(hideTimer); };
   }, []);
 
-  return { visible, opening, stampVisible };
+  return { visible, opening, stampVisible, skip };
 }
 
 /** Scroll progress — how much of the document has been "declassified" */
@@ -363,7 +368,7 @@ function SelfDestructNotice({ timeRemaining }: { timeRemaining: number | null })
 function InactivityWarning({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-none flex items-center justify-center inactivity-warning" aria-hidden="true">
+    <div className="fixed inset-0 z-[90] pointer-events-none flex items-center justify-center inactivity-warning" aria-hidden="true">
       <div className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-blood/40 text-center leading-relaxed">
         THIS DOCUMENT IS BEING MONITORED<br />
         CONTINUED INACTIVITY WILL BE LOGGED
@@ -383,10 +388,10 @@ function DeclassificationBadge({ count }: { count: number }) {
 }
 
 /** Splash screen overlay — classified manila folder */
-function SplashScreen({ visible, opening, stampVisible }: { visible: boolean; opening: boolean; stampVisible: boolean }) {
+function SplashScreen({ visible, opening, stampVisible, onSkip }: { visible: boolean; opening: boolean; stampVisible: boolean; onSkip: () => void }) {
   if (!visible) return null;
   return (
-    <div className={`splash-overlay ${opening ? 'splash-exit' : ''}`}>
+    <div className={`splash-overlay ${opening ? 'splash-exit' : ''}`} onClick={onSkip} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSkip(); }}>
       <div className={`splash-folder ${opening ? 'opening' : ''}`}>
         <div className="splash-folder-label">
           <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-ink/40 mb-2">CASE FILE</div>
@@ -457,9 +462,14 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
 
   const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-  const [slotWidth, setSlotWidth] = useState(112);
+  const [slotWidth, setSlotWidth] = useState(98);
   useEffect(() => {
-    const update = () => setSlotWidth(window.innerWidth >= 640 ? 140 : 112);
+    const update = () => {
+      const w = window.innerWidth;
+      if (w >= 640) setSlotWidth(140);       // 120px card + 20px gap
+      else if (w > 360) setSlotWidth(102);   // 90px card + 12px gap
+      else setSlotWidth(88);                 // 80px card + 8px gap
+    };
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
@@ -555,7 +565,7 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
       </div>
 
       {/* Card table — relative container, cards absolutely positioned */}
-      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 168 : 140 }}>
+      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 168 : slotWidth >= 102 ? 126 : 112 }}>
         {[0, 1, 2].map((cardId) => {
           const slot = cardSlots[cardId];
           const isFlipped = showFaces;
@@ -674,7 +684,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-bone">
       {/* ---- GLOBAL OVERLAYS ---- */}
-      <SplashScreen visible={splash.visible} opening={splash.opening} stampVisible={splash.stampVisible} />
+      <SplashScreen visible={splash.visible} opening={splash.opening} stampVisible={splash.stampVisible} onSkip={splash.skip} />
       <ScrollProgressBar progress={scrollProgress} />
       <KonamiLockdown active={konami.activated} onDismiss={konami.dismiss} />
       <div className="grain-overlay" aria-hidden="true" />
@@ -789,7 +799,9 @@ export default function Home() {
               <img
                 src="/images/evidence01.jpg"
                 alt="Primary subject identification — classified evidence photograph"
-                className="w-full block"
+                className="w-full h-auto block"
+                width={768}
+                height={1360}
                 loading="eager"
                 decoding="async"
                 fetchPriority="high"
@@ -1019,7 +1031,9 @@ export default function Home() {
                 <img
                   src="/images/evidence02.jpg"
                   alt="Subject observed during active doctrinal dissemination"
-                  className="w-full block"
+                  className="w-full h-auto block"
+                  width={1152}
+                  height={2048}
                   loading="lazy"
                   decoding="async"
                 />
@@ -1278,7 +1292,9 @@ export default function Home() {
                   <img
                     src="/images/evidence03.jpg"
                     alt="Final-stage observation — subject in contemplative state"
-                    className="w-full block"
+                    className="w-full h-auto block"
+                    width={1152}
+                    height={2048}
                     loading="lazy"
                     decoding="async"
                   />

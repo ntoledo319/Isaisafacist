@@ -87,7 +87,7 @@ body {
 .grain-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 99;
   pointer-events: none;
   opacity: 0.035;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
@@ -98,7 +98,7 @@ body {
 .scanlines {
   position: fixed;
   inset: 0;
-  z-index: 9998;
+  z-index: 98;
   pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
@@ -219,7 +219,6 @@ body {
   transform: rotate(-3deg);
   display: inline-block;
   opacity: 0;
-  will-change: transform, opacity;
 }
 
 .stamp.stamp-visible {
@@ -244,7 +243,6 @@ body {
   transform: rotate(-5deg);
   display: inline-block;
   opacity: 0;
-  will-change: transform, opacity;
 }
 
 .stamp-classified.stamp-visible {
@@ -534,7 +532,6 @@ body {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: opacity, transform;
 }
 
 .reveal.revealed {
@@ -546,7 +543,6 @@ body {
   opacity: 0;
   transform: translateX(-24px);
   transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: opacity, transform;
 }
 
 .reveal-left.revealed {
@@ -558,7 +554,6 @@ body {
   opacity: 0;
   transform: translateX(24px);
   transition: opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  will-change: opacity, transform;
 }
 
 .reveal-right.revealed {
@@ -570,7 +565,6 @@ body {
   opacity: 0;
   transform: scale(0.92);
   transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  will-change: opacity, transform;
 }
 
 .reveal-scale.revealed {
@@ -1006,6 +1000,27 @@ section:not(:first-of-type) {
   .barcode {
     height: 20px;
   }
+
+  /* Monte game mobile adjustments */
+  .monte-slot {
+    width: 90px;
+    height: 126px;
+  }
+
+  .monte-table {
+    width: min(294px, 100%);
+  }
+}
+
+@media (max-width: 360px) {
+  .monte-slot {
+    width: 80px;
+    height: 112px;
+  }
+
+  .monte-table {
+    width: min(264px, 100%);
+  }
 }
 
 /* ---- TABLET ENHANCEMENTS ---- */
@@ -1083,6 +1098,7 @@ section:not(:first-of-type) {
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  cursor: pointer;
 }
 
 .splash-overlay.splash-exit {
@@ -1149,7 +1165,7 @@ section:not(:first-of-type) {
   left: 0;
   height: 2px;
   background: var(--color-blood);
-  z-index: 9999;
+  z-index: 51;
   transform-origin: left;
   transition: none;
   box-shadow: 0 0 6px rgba(196, 30, 30, 0.4);
@@ -1364,15 +1380,14 @@ section:not(:first-of-type) {
 .monte-table {
   perspective: 900px;
   padding: 16px 0;
-  /* 3 cards: on mobile 3×100px + 2×12px gap = 324px → center with margin */
-  width: 324px;
+  /* 3 cards: 3×100 + 2×12 gap = 324px, or 3×120 + 2×20 = 400px */
+  width: min(324px, 100%);
   margin-left: auto;
   margin-right: auto;
 }
 
 @media (min-width: 640px) {
   .monte-table {
-    /* 3×120px + 2×20px = 400px */
     width: 400px;
   }
 }
@@ -1483,8 +1498,7 @@ section:not(:first-of-type) {
 
 .evidence-glow:hover {
   animation: none;
-  box-shadow: 6px 6px 0px rgba(0,0,0,0.12), 0 0 30px rgba(196, 30, 30, 0.25), 0 0 60px rgba(196, 30, 30, 0.12);
-  transform: rotate(0deg) scale(1.01);
+  box-shadow: 8px 8px 0px rgba(0,0,0,0.15), 0 0 30px rgba(196, 30, 30, 0.25), 0 0 60px rgba(196, 30, 30, 0.12);
 }
 
 /* ---- CUSTOM SCROLLBAR ---- */
