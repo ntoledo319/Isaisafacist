@@ -1181,8 +1181,17 @@ section:not(:first-of-type) {
 
 .profile-row {
   display: flex;
+  flex-direction: column;
   border-bottom: 1px solid rgba(0,0,0,0.08);
   padding: 0.6rem 0;
+  gap: 0.2rem;
+}
+
+@media (min-width: 640px) {
+  .profile-row {
+    flex-direction: row;
+    gap: 0;
+  }
 }
 
 .profile-label {
@@ -1192,8 +1201,13 @@ section:not(:first-of-type) {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--color-gray-bureau);
-  width: 160px;
   flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .profile-label {
+    width: 160px;
+  }
 }
 
 .profile-value {
@@ -1363,22 +1377,30 @@ section:not(:first-of-type) {
   }
 }
 
-.monte-card {
+.monte-slot {
   width: 100px;
   height: 140px;
-  position: relative;
-  cursor: pointer;
-  transform-style: preserve-3d;
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  top: 0;
+  left: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  perspective: 600px;
 }
 
 @media (min-width: 640px) {
-  .monte-card {
+  .monte-slot {
     width: 120px;
     height: 168px;
   }
+}
+
+.monte-card {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
 }
 
 .monte-card.flipped {
@@ -1389,6 +1411,7 @@ section:not(:first-of-type) {
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   border: 2px solid var(--color-ink);
   overflow: hidden;
 }
@@ -1429,23 +1452,6 @@ section:not(:first-of-type) {
   object-fit: cover;
 }
 
-/* Card shuffle arc animation */
-@keyframes monteSwapLeft {
-  0%   { transform: translateX(0) translateY(0); }
-  50%  { transform: translateX(calc(var(--swap-dist) * -1)) translateY(-30px); }
-  100% { transform: translateX(calc(var(--swap-dist) * -2)) translateY(0); }
-}
-
-@keyframes monteSwapRight {
-  0%   { transform: translateX(0) translateY(0); }
-  50%  { transform: translateX(var(--swap-dist)) translateY(30px); }
-  100% { transform: translateX(calc(var(--swap-dist) * 2)) translateY(0); }
-}
-
-.monte-card.shuffling {
-  transition: none;
-}
-
 /* Result styling */
 .monte-result {
   text-align: center;
@@ -1477,7 +1483,8 @@ section:not(:first-of-type) {
 
 .evidence-glow:hover {
   animation: none;
-  box-shadow: 6px 6px 0px rgba(0,0,0,0.12), 0 0 30px rgba(196, 30, 30, 0.25), 0 0 60px rgba(196, 30, 30, 0.12) !important;
+  box-shadow: 6px 6px 0px rgba(0,0,0,0.12), 0 0 30px rgba(196, 30, 30, 0.25), 0 0 60px rgba(196, 30, 30, 0.12);
+  transform: rotate(0deg) scale(1.01);
 }
 
 /* ---- CUSTOM SCROLLBAR ---- */

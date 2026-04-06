@@ -539,9 +539,6 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
     setPhase('result');
   }, [phase, cardSlots]);
 
-  // Which slot did the user click? We need to map pointer position back to slot.
-  // Simpler: render a transparent click target for each slot.
-
   return (
     <div className="monte-game">
       <div className="text-center mb-4">
@@ -569,10 +566,9 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
           return (
             <div
               key={`card-${cardId}`}
-              className={`monte-card absolute top-0 ${isFlipped ? 'flipped' : ''}`}
+              className="monte-slot"
               style={{
-                left: 0,
-                transform: `translateX(${getSlotX(slot)}px)${isFlipped ? ' rotateY(180deg)' : ''}`,
+                transform: `translateX(${getSlotX(slot)}px)`,
                 transition: phase === 'shuffling'
                   ? 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                   : 'transform 0.5s ease',
@@ -591,26 +587,28 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
               tabIndex={isPickable ? 0 : undefined}
               aria-label={isPickable ? `Select card ${slot + 1}` : undefined}
             >
-              {/* Back */}
-              <div className="monte-card-face monte-card-back">
-                <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/40 z-10">CLASSIFIED</div>
-                <div className="text-white/20 text-2xl my-2 z-10">◆</div>
-                <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-white/20 z-10">ISA-2024</div>
-              </div>
-              {/* Front */}
-              {isIsa ? (
-                <div className="monte-card-face monte-card-front">
-                  <img src="/images/evidence03.jpg" alt="Subject ISA" />
+              <div className={`monte-card ${isFlipped ? 'flipped' : ''}`}>
+                {/* Back */}
+                <div className="monte-card-face monte-card-back">
+                  <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/40 z-10">CLASSIFIED</div>
+                  <div className="text-white/20 text-2xl my-2 z-10">◆</div>
+                  <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-white/20 z-10">ISA-2024</div>
                 </div>
-              ) : (
-                <div className="monte-card-face monte-card-front bg-paper flex flex-col items-center justify-center p-3">
-                  <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-gray-bureau mb-1">
-                    {cardId === 1 ? 'EXHIBIT X-7' : 'EXHIBIT X-9'}
+                {/* Front */}
+                {isIsa ? (
+                  <div className="monte-card-face monte-card-front">
+                    <img src="/images/evidence03.jpg" alt="Subject ISA" />
                   </div>
-                  <div className="text-3xl mb-1 opacity-30">◉</div>
-                  <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-ink/30">DECOY FILE</div>
-                </div>
-              )}
+                ) : (
+                  <div className="monte-card-face monte-card-front bg-paper flex flex-col items-center justify-center p-3">
+                    <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-gray-bureau mb-1">
+                      {cardId === 1 ? 'EXHIBIT X-7' : 'EXHIBIT X-9'}
+                    </div>
+                    <div className="text-3xl mb-1 opacity-30">◉</div>
+                    <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-ink/30">DECOY FILE</div>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
@@ -922,7 +920,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto relative z-10">
           {/* Section metadata */}
           <div className="dossier-tab mb-8 reveal">
-            Section II &nbsp;/&nbsp; Threat Analysis &nbsp;/&nbsp; Page 2 of 6
+            Section III &nbsp;/&nbsp; Threat Analysis &nbsp;/&nbsp; Page 3 of 7
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-8 reveal delay-1">
@@ -1000,7 +998,7 @@ export default function Home() {
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="dossier-tab mb-6 reveal">
-            Section III &nbsp;/&nbsp; Recovered Doctrines &nbsp;/&nbsp; Evidence of Spread
+            Section IV &nbsp;/&nbsp; Recovered Doctrines &nbsp;/&nbsp; Evidence of Spread
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-4 reveal delay-1">
@@ -1115,7 +1113,7 @@ export default function Home() {
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-white/40 mb-6 reveal">
-            Section IV &nbsp;/&nbsp; Foundational Architecture &nbsp;/&nbsp; CLASSIFIED
+            Section V &nbsp;/&nbsp; Foundational Architecture &nbsp;/&nbsp; CLASSIFIED
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl lg:text-6xl font-black leading-[1.0] mb-4 reveal delay-1">
@@ -1209,7 +1207,7 @@ export default function Home() {
 
         <div className="max-w-2xl mx-auto relative z-10">
           <div className="dossier-tab mb-6 reveal">
-            Section V &nbsp;/&nbsp; Civilian Preparedness Memo &nbsp;/&nbsp; FINAL ADVISORY
+            Section VI &nbsp;/&nbsp; Civilian Preparedness Memo &nbsp;/&nbsp; FINAL ADVISORY
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-6 reveal delay-1">
