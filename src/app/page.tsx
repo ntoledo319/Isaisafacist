@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
+/* ────────────────────────────────────────────────────────
+   HOOKS
+   ──────────────────────────────────────────────────────── */
+
 function useScrollReveal() {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -26,7 +30,7 @@ function useScrollReveal() {
           }
         });
       },
-      { threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
+      { threshold: 0.1, rootMargin: '0px 0px -20px 0px' }
     );
 
     const revealEls = el.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .section-divider');
@@ -41,27 +45,36 @@ function useScrollReveal() {
   return ref;
 }
 
-function useScrollProgress() {
-  const [progress, setProgress] = useState(0);
+/** Tracks which section (1-6) the reader is currently viewing */
+function useCurrentSection() {
+  const [section, setSection] = useState(1);
+  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
 
-  useEffect(() => {
-    let ticking = false;
-    const onScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const scrollTop = window.scrollY;
-          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-          setProgress(docHeight > 0 ? scrollTop / docHeight : 0);
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+  const registerSection = useCallback((index: number) => (el: HTMLElement | null) => {
+    sectionRefs.current[index] = el;
   }, []);
 
-  return progress;
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const idx = sectionRefs.current.indexOf(entry.target as HTMLElement);
+            if (idx >= 0) setSection(idx + 1);
+          }
+        });
+      },
+      { threshold: 0.3 }
+    );
+
+    sectionRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return { section, registerSection };
 }
 
 function useLiveTimestamp() {
@@ -90,39 +103,124 @@ function useLiveTimestamp() {
   return time;
 }
 
-const FLOATING_SYMBOLS = ['◉', '▲', '✕', '◆', '●', '■', '△', '○'];
+/** Counts how many redacted items the reader has declassified */
+function useDeclassificationCount() {
+  const [count, setCount] = useState(0);
+  const increment = useCallback(() => setCount((c) => c + 1), []);
+  return { count, increment };
+}
 
-function FloatingSymbols() {
+/** Self-destruct timer — appears after 60s on page */
+function useSelfDestruct() {
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const activateTimer = setTimeout(() => {
+      setActive(true);
+      setTimeRemaining(300); // 5 minute countdown
+    }, 60000);
+
+    return () => clearTimeout(activateTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!active || timeRemaining === null || timeRemaining <= 0) return;
+    const tick = setInterval(() => {
+      setTimeRemaining((t) => (t !== null && t > 0 ? t - 1 : 0));
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [active, timeRemaining]);
+
+  return { active, timeRemaining };
+}
+
+/** Inactivity warning — shows after 30s of no interaction */
+function useInactivityWarning() {
+  const [idle, setIdle] = useState(false);
+
+  useEffect(() => {
+    let timeout = setTimeout(() => setIdle(true), 30000);
+
+    const reset = () => {
+      setIdle(false);
+      clearTimeout(timeout);
+      timeout = setTimeout(() => setIdle(true), 30000);
+    };
+
+    window.addEventListener('scroll', reset, { passive: true });
+    window.addEventListener('mousemove', reset, { passive: true });
+    window.addEventListener('click', reset, { passive: true });
+    window.addEventListener('touchstart', reset, { passive: true });
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('scroll', reset);
+      window.removeEventListener('mousemove', reset);
+      window.removeEventListener('click', reset);
+      window.removeEventListener('touchstart', reset);
+    };
+  }, []);
+
+  return idle;
+}
+
+/* ────────────────────────────────────────────────────────
+   SECTION LABELS (for page counter)
+   ──────────────────────────────────────────────────────── */
+const SECTION_LABELS = [
+  'I / National Threat Bulletin',
+  'II / Threat Analysis',
+  'III / Recovered Doctrines',
+  'IV / Operational Pillars',
+  'V / Civilian Preparedness',
+  'VI / Issuing Body',
+];
+
+/* ────────────────────────────────────────────────────────
+   COMPONENTS
+   ──────────────────────────────────────────────────────── */
+
+/** Static document handling artifacts — staple, paperclip, routing stamp */
+function DocumentArtifacts() {
   return (
     <>
-      {FLOATING_SYMBOLS.map((sym, i) => (
-        <span
-          key={i}
-          className="floating-symbol"
-          style={{
-            left: `${10 + i * 11}%`,
-            top: `${15 + (i % 3) * 25}%`,
-            animationDelay: `${i * 0.8}s`,
-            animationDuration: `${5 + (i % 3) * 2}s`,
-            fontSize: `${0.8 + (i % 4) * 0.3}rem`,
-          }}
-          aria-hidden="true"
-        >
-          {sym}
-        </span>
-      ))}
+      {/* Staple holes — top left */}
+      <div className="absolute top-6 left-5 z-[2] pointer-events-none" aria-hidden="true">
+        <div className="w-[3px] h-[8px] bg-ink/20 rounded-[1px] mb-[3px]" />
+        <div className="w-[3px] h-[8px] bg-ink/20 rounded-[1px]" />
+      </div>
+      {/* Paperclip shadow — top right */}
+      <div
+        className="absolute top-3 right-8 w-[14px] h-[40px] border-2 border-ink/10 rounded-full pointer-events-none z-[2]"
+        style={{ borderBottom: 'none', transform: 'rotate(5deg)' }}
+        aria-hidden="true"
+      />
+      {/* Single routing stamp */}
+      <div
+        className="absolute top-14 right-4 font-mono text-[0.4rem] tracking-[0.15em] uppercase text-ink/[0.08] rotate-[-3deg] pointer-events-none z-[2] select-none"
+        aria-hidden="true"
+      >
+        RECEIVED — DEPT. OF CULTURAL AFFAIRS
+      </div>
+      {/* Copy number */}
+      <div
+        className="absolute top-14 left-4 font-mono text-[0.4rem] tracking-[0.1em] uppercase text-ink/[0.12] pointer-events-none z-[2] select-none"
+        aria-hidden="true"
+      >
+        COPY 3 OF 7
+      </div>
     </>
   );
 }
 
-function ScrollProgressBar() {
-  const progress = useScrollProgress();
+/** Case file page counter — bottom right, document-native */
+function PageCounter({ section }: { section: number }) {
   return (
-    <div
-      className="scroll-progress"
-      style={{ transform: `scaleX(${progress})`, width: '100%' }}
-      aria-hidden="true"
-    />
+    <div className="fixed bottom-3 right-3 z-50 font-mono text-[0.5rem] tracking-[0.15em] uppercase text-ink/20 pointer-events-none select-none page-counter" aria-hidden="true">
+      <div>CASE FILE ISA-2024-001</div>
+      <div>PAGE {section} OF 6</div>
+    </div>
   );
 }
 
@@ -141,27 +239,41 @@ function Barcode() {
   );
 }
 
+/** Rebuilt threat meter — 5 discrete assessment boxes, static, form-like */
 function ThreatMeter() {
+  const levels = ['LOW', 'GUARDED', 'ELEVATED', 'HIGH', 'SEVERE'];
   return (
-    <div className="max-w-xs mx-auto mt-6 fade-in fade-in-delay-5">
-      <div className="flex justify-between mb-1">
-        <span className="font-mono text-[0.5rem] tracking-widest uppercase text-gray-bureau">THREAT LEVEL</span>
-        <span className="font-mono text-[0.5rem] tracking-widest uppercase text-blood font-bold">MAXIMUM</span>
+    <div className="max-w-sm mx-auto mt-6 fade-in fade-in-delay-5">
+      <div className="font-mono text-[0.5rem] tracking-widest uppercase text-gray-bureau mb-2">THREAT ASSESSMENT</div>
+      <div className="flex gap-[3px] mb-1">
+        {levels.map((level, i) => (
+          <div key={level} className="flex-1 flex flex-col items-center">
+            <div
+              className="w-full h-[8px] border border-ink/30"
+              style={{
+                background: `rgba(196, 30, 30, ${0.2 + i * 0.2})`,
+              }}
+            />
+            <span className="font-mono text-[0.35rem] tracking-wider mt-0.5 text-ink/40 uppercase">{level}</span>
+          </div>
+        ))}
       </div>
-      <div className="w-full bg-ink/10 rounded-full h-[6px] overflow-hidden">
-        <div className="threat-meter-bar" />
+      <div className="flex justify-between items-center mt-1.5">
+        <span className="font-mono text-[0.5rem] tracking-widest uppercase text-blood font-bold">ASSESSMENT: 5/5 — MAXIMUM</span>
+        <span className="font-mono text-[0.4rem] tracking-wider text-ink/30 uppercase">SCALE EXCEEDED — SEE ADDENDUM 4.7</span>
       </div>
     </div>
   );
 }
 
-function RedactedText({ children }: { children: string }) {
+function RedactedText({ children, onDeclassify }: { children: string; onDeclassify?: () => void }) {
   const handleClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
     const el = e.currentTarget;
     if (!el.classList.contains('declassified')) {
       el.classList.add('declassified');
+      onDeclassify?.();
     }
-  }, []);
+  }, [onDeclassify]);
 
   return (
     <span className="redacted" onClick={handleClick} title="Click to declassify">
@@ -169,6 +281,53 @@ function RedactedText({ children }: { children: string }) {
     </span>
   );
 }
+
+/** Self-destruct notice */
+function SelfDestructNotice({ timeRemaining }: { timeRemaining: number | null }) {
+  if (timeRemaining === null) return null;
+  const mins = Math.floor(timeRemaining / 60);
+  const secs = timeRemaining % 60;
+  return (
+    <div className="fixed bottom-3 left-3 z-50 font-mono text-[0.5rem] tracking-[0.15em] uppercase self-destruct-notice select-none pointer-events-none" aria-hidden="true">
+      <span className="text-blood/60">DOCUMENT AUTO-PURGE IN {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}</span>
+    </div>
+  );
+}
+
+/** Inactivity warning overlay */
+function InactivityWarning({ visible }: { visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <div className="fixed inset-0 z-[9997] pointer-events-none flex items-center justify-center inactivity-warning" aria-hidden="true">
+      <div className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-blood/40 text-center leading-relaxed">
+        THIS DOCUMENT IS BEING MONITORED<br />
+        CONTINUED INACTIVITY WILL BE LOGGED
+      </div>
+    </div>
+  );
+}
+
+/** Declassification counter in header */
+function DeclassificationBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="text-crayon-yellow font-bold">
+      {count} DECLASSIFIED
+    </span>
+  );
+}
+
+/* Doctrine card stamp variations — different analysts handled different cards */
+const DOCTRINE_STAMPS = [
+  'CONFIRMED',
+  'CORROBORATED',
+  'FIELD VERIFIED',
+  'SEE ANNEX B',
+  'INTERCEPTED',
+  'EYES ONLY',
+  'FLAGGED',
+  'UNCONTESTED',
+];
 
 export default function Home() {
   const heroRef = useScrollReveal();
@@ -178,13 +337,19 @@ export default function Home() {
   const actVRef = useScrollReveal();
   const footerRef = useScrollReveal();
   const timestamp = useLiveTimestamp();
+  const { section, registerSection } = useCurrentSection();
+  const { count: declassifiedCount, increment: onDeclassify } = useDeclassificationCount();
+  const { active: selfDestructActive, timeRemaining } = useSelfDestruct();
+  const isIdle = useInactivityWarning();
 
   return (
     <main className="min-h-screen bg-bone">
       {/* ---- GLOBAL OVERLAYS ---- */}
-      <ScrollProgressBar />
       <div className="grain-overlay" aria-hidden="true" />
       <div className="scanlines" aria-hidden="true" />
+      <PageCounter section={section} />
+      {selfDestructActive && <SelfDestructNotice timeRemaining={timeRemaining} />}
+      <InactivityWarning visible={isIdle} />
 
       {/* ============================================= */}
       {/* WARNING STRIPE TOP BAR */}
@@ -196,7 +361,9 @@ export default function Home() {
       {/* ============================================= */}
       <div className="bg-ink text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm bg-ink/95">
         <span>Classification: <span className="text-crayon-red font-bold">CULTURAL EMERGENCY</span></span>
-        <span className="flex items-center gap-2">
+        <span className="flex items-center gap-3">
+          <DeclassificationBadge count={declassifiedCount} />
+          <span className="hidden sm:inline text-white/40">SEC {SECTION_LABELS[section - 1]}</span>
           <span className="live-timestamp hidden sm:inline">{timestamp}</span>
           <span className="pulse-dot" />
           LIVE THREAT
@@ -206,12 +373,12 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT I — HERO / NATIONAL CULTURAL THREAT BULLETIN */}
       {/* ============================================= */}
-      <section ref={heroRef} className="relative px-4 pt-14 pb-20 md:pt-24 md:pb-28 overflow-hidden">
+      <section ref={(el) => { heroRef.current = el; registerSection(0)(el); }} className="relative px-4 pt-14 pb-20 md:pt-24 md:pb-28 overflow-hidden">
         {/* CLASSIFIED watermark */}
         <div className="classified-watermark" aria-hidden="true" />
 
-        {/* Floating symbols */}
-        <FloatingSymbols />
+        {/* Document handling artifacts — staple, paperclip, routing stamp */}
+        <DocumentArtifacts />
 
         {/* Registration marks */}
         <div className="registration-mark top-4 left-4" aria-hidden="true" />
@@ -221,6 +388,13 @@ export default function Home() {
 
         {/* Document crease */}
         <div className="doc-crease top-[55%]" aria-hidden="true" />
+
+        {/* Binder holes — left margin */}
+        <div className="absolute left-3 top-[20%] flex flex-col gap-[180px] pointer-events-none z-[2]" aria-hidden="true">
+          <div className="w-[10px] h-[10px] rounded-full border-2 border-ink/10" />
+          <div className="w-[10px] h-[10px] rounded-full border-2 border-ink/10" />
+          <div className="w-[10px] h-[10px] rounded-full border-2 border-ink/10" />
+        </div>
 
         {/* File number + barcode */}
         <div className="flex items-center justify-between mb-8 fade-in relative z-10">
@@ -245,10 +419,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* MAIN TITLE — GLITCH */}
+        {/* MAIN TITLE — Photocopy misregistration, not RGB glitch */}
         <h1
-          className="hero-title glitch-text text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-6 fade-in fade-in-delay-2 relative z-10"
-          data-text="ISA-FASCIST"
+          className="hero-title xerox-text text-center font-display text-[4.5rem] md:text-[8rem] lg:text-[10rem] leading-[0.9] tracking-wide text-ink mb-6 fade-in fade-in-delay-2 relative z-10"
         >
           ISA-FASCIST
         </h1>
@@ -287,6 +460,7 @@ export default function Home() {
                 className="w-full block"
                 loading="eager"
                 decoding="async"
+                fetchPriority="high"
               />
               {/* Crayon circle overlay */}
               <div
@@ -305,7 +479,7 @@ export default function Home() {
             </div>
             <div className="mt-2 flex justify-between items-end">
               <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                DATE: <RedactedText>04/15/2024</RedactedText> &nbsp;/&nbsp; SOURCE: FIELD UNIT
+                DATE: <RedactedText onDeclassify={onDeclassify}>04/15/2024</RedactedText> &nbsp;/&nbsp; SOURCE: FIELD UNIT
               </span>
               <span className="stamp text-[0.5rem] py-0.5 px-2 border-2">
                 AUTH.
@@ -332,7 +506,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT II — WHAT IS ISA FASCISM? */}
       {/* ============================================= */}
-      <section ref={actIIRef} className="px-4 py-16 md:py-24 relative">
+      <section ref={(el) => { actIIRef.current = el; registerSection(1)(el); }} className="px-4 py-16 md:py-24 relative">
         {/* Classified watermark */}
         <div className="classified-watermark" aria-hidden="true" />
         {/* Coffee stain */}
@@ -391,7 +565,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT III — RECOVERED DOCTRINES / EVIDENCE */}
       {/* ============================================= */}
-      <section ref={actIIIRef} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
+      <section ref={(el) => { actIIIRef.current = el; registerSection(2)(el); }} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
         {/* Coffee stain */}
         <div className="coffee-stain" style={{ top: '3%', left: '8%' }} aria-hidden="true" />
         <div className="coffee-stain coffee-stain-sm" style={{ bottom: '20%', right: '6%' }} aria-hidden="true" />
@@ -433,7 +607,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="mt-2 font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                SURVEILLANCE FRAME &nbsp;/&nbsp; LOCATION: <RedactedText>UNDISCLOSED</RedactedText> &nbsp;/&nbsp; CONTEXT: DOCTRINAL ADDRESS
+                SURVEILLANCE FRAME &nbsp;/&nbsp; LOCATION: <RedactedText onDeclassify={onDeclassify}>UNDISCLOSED</RedactedText> &nbsp;/&nbsp; CONTEXT: DOCTRINAL ADDRESS
               </div>
             </div>
           </div>
@@ -455,8 +629,8 @@ export default function Home() {
               },
               {
                 id: 'DC-03',
-                title: 'Mandatory Solitaire',
-                text: 'Solo card play required during all periods of downtime. Digital versions are considered heresy.',
+                title: 'Involuntary Playlist Dictatorship',
+                text: 'Aux cord privileges revoked for all citizens. One playlist. Her playlist. Every car. Every function. No appeals.',
                 level: 'ACTIVE',
               },
               {
@@ -477,20 +651,8 @@ export default function Home() {
                 text: 'Sleep schedules eliminated. Time is a construct and that construct has been defunded.',
                 level: 'PERMANENT',
               },
-              {
-                id: 'DC-07',
-                title: 'Universal Trifold Poster Board',
-                text: 'Government-provided universal trifold poster board for all citizens. Glitter allocation pending.',
-                level: 'SUBSIDIZED',
-              },
-              {
-                id: 'DC-08',
-                title: 'National Sobriety Countdown Assemblies',
-                text: 'National assemblies in the style of a sobriety countdown announced by category of pro-Isa action.',
-                level: 'CEREMONIAL',
-              },
             ].map((doctrine, i) => (
-              <div key={doctrine.id} className={`doctrine-card reveal delay-${(i % 4) + 1}`}>
+              <div key={doctrine.id} className={`doctrine-card reveal delay-${(i % 4) + 1}`} data-stamp={DOCTRINE_STAMPS[i]}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="font-mono text-[0.55rem] font-bold tracking-widest text-white bg-ink px-2 py-0.5">
                     {doctrine.id}
@@ -519,27 +681,9 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT IV — THE FIVE OPERATIONAL PILLARS */}
       {/* ============================================= */}
-      <section ref={actIVRef} className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
-        {/* Grid bg replaced with dedicated class */}
+      <section ref={(el) => { actIVRef.current = el; registerSection(3)(el); }} className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
+        {/* Grid bg */}
         <div className="footer-grid" aria-hidden="true" />
-
-        {/* Floating red symbols in the dark section */}
-        {['◉', '▲', '■', '○', '△'].map((sym, i) => (
-          <span
-            key={`pillar-sym-${i}`}
-            className="floating-symbol"
-            style={{
-              left: `${5 + i * 20}%`,
-              top: `${10 + (i % 3) * 30}%`,
-              animationDelay: `${i * 1.2}s`,
-              animationDuration: `${6 + i}s`,
-              color: 'rgba(196, 30, 30, 0.15)',
-            }}
-            aria-hidden="true"
-          >
-            {sym}
-          </span>
-        ))}
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-white/40 mb-6 reveal">
@@ -629,7 +773,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT V — INEVITABILITY / CIVILIAN PREPAREDNESS */}
       {/* ============================================= */}
-      <section ref={actVRef} className="px-4 py-16 md:py-24 relative">
+      <section ref={(el) => { actVRef.current = el; registerSection(4)(el); }} className="px-4 py-16 md:py-24 relative">
         {/* Classified watermark */}
         <div className="classified-watermark" aria-hidden="true" />
         {/* Coffee stain */}
@@ -740,7 +884,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT VI — FOOTER / ISSUING BODY */}
       {/* ============================================= */}
-      <footer ref={footerRef} className="bg-ink text-white px-4 py-20 md:py-28 relative overflow-hidden">
+      <footer ref={(el) => { footerRef.current = el; registerSection(5)(el); }} className="bg-ink text-white px-4 py-20 md:py-28 relative overflow-hidden">
         {/* Grid lines */}
         <div className="footer-grid" aria-hidden="true" />
 
@@ -779,7 +923,21 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-white/10 reveal delay-4">
+          {/* Distribution list */}
+          <div className="mt-8 reveal delay-3">
+            <p className="font-mono text-[0.45rem] tracking-[0.15em] uppercase text-white/20 leading-loose">
+              DISTRIBUTION: <RedactedText onDeclassify={onDeclassify}>THE GROUP CHAT</RedactedText>, <RedactedText onDeclassify={onDeclassify}>EVERYONE AT BRUNCH</RedactedText>, <RedactedText onDeclassify={onDeclassify}>HER MOM (ACCIDENTALLY)</RedactedText>, AND UNFORTUNATELY, THE GENERAL PUBLIC
+            </p>
+          </div>
+
+          {/* DOCUMENT REVIEWED IN FULL stamp — only appears when reader reaches footer */}
+          <div className="mt-6 text-center reveal-scale delay-4">
+            <div className="stamp inline-block text-white/60 border-white/30">
+              DOCUMENT REVIEWED IN FULL
+            </div>
+          </div>
+
+          <div className="mt-10 pt-6 border-t border-white/10 reveal delay-5">
             <p className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-white/20 leading-relaxed">
               THIS IS SATIRE. THIS IS PARODY. THIS IS ART. THIS IS ABSURDIST SOCIAL COMMENTARY.<br />
               NO ACTUAL GOVERNMENTS, AGENCIES, OR FASCISMS WERE HARMED IN THE MAKING OF THIS DOCUMENT.<br />
