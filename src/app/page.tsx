@@ -45,7 +45,7 @@ function useScrollReveal() {
   return ref;
 }
 
-/** Tracks which section (1-6) the reader is currently viewing */
+/** Tracks which section (1-7) the reader is currently viewing */
 function useCurrentSection() {
   const [section, setSection] = useState(1);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
@@ -165,16 +165,87 @@ function useInactivityWarning() {
   return idle;
 }
 
+/** Splash screen — classified folder opening animation, click to skip */
+function useSplashScreen() {
+  const [visible, setVisible] = useState(true);
+  const [opening, setOpening] = useState(false);
+  const [stampVisible, setStampVisible] = useState(false);
+
+  const skip = useCallback(() => {
+    setOpening(true);
+    setTimeout(() => setVisible(false), 600);
+  }, []);
+
+  useEffect(() => {
+    const stampTimer = setTimeout(() => setStampVisible(true), 600);
+    const openTimer = setTimeout(() => setOpening(true), 2200);
+    const hideTimer = setTimeout(() => setVisible(false), 3200);
+    return () => { clearTimeout(stampTimer); clearTimeout(openTimer); clearTimeout(hideTimer); };
+  }, []);
+
+  return { visible, opening, stampVisible, skip };
+}
+
+/** Scroll progress — how much of the document has been "declassified" */
+function useScrollProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      const scrollTop = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      setProgress(docHeight > 0 ? Math.min(scrollTop / docHeight, 1) : 0);
+    };
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+    return () => window.removeEventListener('scroll', update);
+  }, []);
+
+  return progress;
+}
+
+/** Konami code easter egg — ↑↑↓↓←→←→BA */
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'] as const;
+
+function useKonamiCode() {
+  const [activated, setActivated] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const sequence = useRef<string[]>([]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      sequence.current.push(e.key);
+      sequence.current = sequence.current.slice(-10);
+      if (KONAMI.every((k, i) => sequence.current[i] === k)) {
+        setActivated(true);
+        document.body.classList.add('screen-shake');
+        setTimeout(() => document.body.classList.remove('screen-shake'), 400);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    setTimeout(() => { setActivated(false); setDismissed(false); }, 600);
+    sequence.current = [];
+  }, []);
+
+  return { activated: activated && !dismissed, dismiss };
+}
+
 /* ────────────────────────────────────────────────────────
    SECTION LABELS (for page counter)
    ──────────────────────────────────────────────────────── */
 const SECTION_LABELS = [
   'I / National Threat Bulletin',
-  'II / Threat Analysis',
-  'III / Recovered Doctrines',
-  'IV / Operational Pillars',
-  'V / Civilian Preparedness',
-  'VI / Issuing Body',
+  'II / Subject Profile',
+  'III / Threat Analysis',
+  'IV / Recovered Doctrines',
+  'V / Operational Pillars',
+  'VI / Civilian Preparedness',
+  'VII / Issuing Body',
 ];
 
 /* ────────────────────────────────────────────────────────
@@ -219,7 +290,7 @@ function PageCounter({ section }: { section: number }) {
   return (
     <div className="fixed bottom-3 right-3 z-50 font-mono text-[0.5rem] tracking-[0.15em] uppercase text-ink/20 pointer-events-none select-none page-counter" aria-hidden="true">
       <div>CASE FILE ISA-2024-001</div>
-      <div>PAGE {section} OF 6</div>
+      <div>PAGE {section} OF 7</div>
     </div>
   );
 }
@@ -298,7 +369,7 @@ function SelfDestructNotice({ timeRemaining }: { timeRemaining: number | null })
 function InactivityWarning({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-none flex items-center justify-center inactivity-warning" aria-hidden="true">
+    <div className="fixed inset-0 z-[90] pointer-events-none flex items-center justify-center inactivity-warning" aria-hidden="true">
       <div className="font-mono text-[0.7rem] tracking-[0.3em] uppercase text-blood/40 text-center leading-relaxed">
         THIS DOCUMENT IS BEING MONITORED<br />
         CONTINUED INACTIVITY WILL BE LOGGED
@@ -317,6 +388,270 @@ function DeclassificationBadge({ count }: { count: number }) {
   );
 }
 
+/** Splash screen overlay — classified manila folder */
+function SplashScreen({ visible, opening, stampVisible, onSkip }: { visible: boolean; opening: boolean; stampVisible: boolean; onSkip: () => void }) {
+  if (!visible) return null;
+  return (
+    <div className={`splash-overlay ${opening ? 'splash-exit' : ''}`} onClick={onSkip} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSkip(); }}>
+      <div className={`splash-folder ${opening ? 'opening' : ''}`}>
+        <div className="splash-folder-label">
+          <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-ink/40 mb-2">CASE FILE</div>
+          <div className="font-display text-2xl tracking-wider text-ink">ISA-2024-001</div>
+          <div className="font-mono text-[0.45rem] tracking-[0.15em] uppercase text-ink/30 mt-2">CULTURAL AFFAIRS DIVISION</div>
+          <div className="font-mono text-[0.4rem] tracking-[0.1em] uppercase text-blood mt-4">DO NOT DISTRIBUTE</div>
+        </div>
+        <div className={`splash-stamp ${stampVisible ? 'visible' : ''}`}>CLASSIFIED</div>
+      </div>
+      <div className="font-mono text-[0.5rem] tracking-[0.3em] uppercase text-white/20 mt-8">
+        LOADING THREAT ASSESSMENT...
+      </div>
+    </div>
+  );
+}
+
+/** Scroll progress bar — declassification percentage */
+function ScrollProgressBar({ progress }: { progress: number }) {
+  return (
+    <div className="scroll-progress" style={{ width: `${progress * 100}%` }} aria-hidden="true" />
+  );
+}
+
+/** Failed redaction — text that glitches through the black bar */
+function FailedRedaction({ children }: { children: string }) {
+  return (
+    <span className="redacted-fail">
+      <span className="redacted-fail-text">{children}</span>
+    </span>
+  );
+}
+
+/** Konami code lockdown overlay */
+function KonamiLockdown({ active, onDismiss }: { active: boolean; onDismiss: () => void }) {
+  if (!active) return null;
+  return (
+    <div className="konami-lockdown" onClick={onDismiss}>
+      <div className="lockdown-stamp">LOCKDOWN</div>
+      <div className="font-mono text-[0.6rem] tracking-[0.3em] uppercase text-white/40 mt-8">
+        UNAUTHORIZED ACCESS SEQUENCE DETECTED
+      </div>
+      <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-blood/60 mt-3">
+        ALL PERSONNEL REPORT TO DEBRIEF STATION 7
+      </div>
+      <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/20 mt-12">
+        CLICK ANYWHERE TO RESUME DOCUMENT REVIEW
+      </div>
+    </div>
+  );
+}
+
+/** Three-Card Monte — hidden game triggered by clicking the final evidence photo.
+ *  3 card objects (key = card identity) each assigned a slot (0/1/2).
+ *  React key stays on the card, so the DOM node persists across slot changes,
+ *  and CSS transition on `transform: translateX()` animates the movement. */
+function ThreeCardMonte({ onClose }: { onClose: () => void }) {
+  type Phase = 'intro' | 'reveal' | 'shuffling' | 'picking' | 'result';
+  const [phase, setPhase] = useState<Phase>('intro');
+  // cardSlots[cardId] = which slot (0,1,2) that card occupies
+  const [cardSlots, setCardSlots] = useState<[number, number, number]>([0, 1, 2]);
+  const [picked, setPicked] = useState<number | null>(null); // slot index the user clicked
+  const [won, setWon] = useState(false);
+  const [showFaces, setShowFaces] = useState(false);
+  const alive = useRef(true);
+
+  // Card 0 is always Isa. Cards 1 and 2 are decoys.
+  const ISA = 0;
+
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  const [slotWidth, setSlotWidth] = useState(98);
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      if (w >= 640) setSlotWidth(140);       // 120px card + 20px gap
+      else if (w > 360) setSlotWidth(102);   // 90px card + 12px gap
+      else setSlotWidth(88);                 // 80px card + 8px gap
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const getSlotX = useCallback((slot: number) => slot * slotWidth, [slotWidth]);
+
+  const startGame = useCallback(async () => {
+    alive.current = true;
+
+    // Random initial placement for Isa
+    const isaSlot = Math.floor(Math.random() * 3);
+    const decoySlots = [0, 1, 2].filter(s => s !== isaSlot);
+    const init: [number, number, number] = [isaSlot, decoySlots[0], decoySlots[1]];
+    setCardSlots(init);
+    setPicked(null);
+    setWon(false);
+
+    // Show faces
+    setPhase('reveal');
+    setShowFaces(true);
+    await sleep(2200);
+    if (!alive.current) return;
+
+    // Flip back down
+    setShowFaces(false);
+    await sleep(700);
+    if (!alive.current) return;
+
+    // Shuffle: 6-9 swaps
+    setPhase('shuffling');
+    const numSwaps = 6 + Math.floor(Math.random() * 4);
+    const cur: [number, number, number] = [...init];
+
+    for (let i = 0; i < numSwaps; i++) {
+      if (!alive.current) return;
+      // Pick two cards to swap slots
+      const a = Math.floor(Math.random() * 3);
+      let b = a;
+      while (b === a) b = Math.floor(Math.random() * 3);
+      const tmp = cur[a]; cur[a] = cur[b]; cur[b] = tmp;
+      setCardSlots([...cur]);
+      await sleep(Math.max(280, 520 - i * 30));
+    }
+
+    // Rig: 75% chance we do one extra swap moving Isa to confuse
+    if (Math.random() > 0.25) {
+      if (!alive.current) return;
+      const isaAt = cur[ISA];
+      const others = [0, 1, 2].filter(s => s !== isaAt);
+      const target = others[Math.floor(Math.random() * others.length)];
+      // Find which card is at target slot
+      const otherCard = cur.indexOf(target);
+      const tmp = cur[ISA]; cur[ISA] = cur[otherCard]; cur[otherCard] = tmp;
+      setCardSlots([...cur]);
+      await sleep(380);
+    }
+
+    if (!alive.current) return;
+    setPhase('picking');
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'intro') {
+      const t = setTimeout(startGame, 600);
+      return () => clearTimeout(t);
+    }
+  }, [phase, startGame]);
+
+  useEffect(() => () => { alive.current = false; }, []);
+
+  const handlePick = useCallback((slot: number) => {
+    if (phase !== 'picking') return;
+    setPicked(slot);
+    setWon(cardSlots[ISA] === slot);
+    setShowFaces(true);
+    setPhase('result');
+  }, [phase, cardSlots]);
+
+  return (
+    <div className="monte-game">
+      <div className="text-center mb-4">
+        <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-gray-bureau mb-1">
+          CLASSIFIED — EVIDENCE SHUFFLE PROTOCOL
+        </div>
+        <div className="font-headline text-base md:text-xl font-bold text-ink leading-snug">
+          {phase === 'intro' && 'Initializing shuffle protocol...'}
+          {phase === 'reveal' && 'Observe. Remember the subject.'}
+          {phase === 'shuffling' && 'Tracking in progress...'}
+          {phase === 'picking' && 'Select a card, agent.'}
+          {phase === 'result' && (won ? 'Congratulations, Isa wins!' : 'Congratulations, you win nothing!')}
+        </div>
+      </div>
+
+      {/* Card table — relative container, cards absolutely positioned */}
+      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 168 : slotWidth >= 102 ? 126 : 112 }}>
+        {[0, 1, 2].map((cardId) => {
+          const slot = cardSlots[cardId];
+          const isFlipped = showFaces;
+          const isIsa = cardId === ISA;
+          const isPickedSlot = picked === slot;
+          const isPickable = phase === 'picking';
+
+          return (
+            <div
+              key={`card-${cardId}`}
+              className="monte-slot"
+              style={{
+                transform: `translateX(${getSlotX(slot)}px)`,
+                transition: phase === 'shuffling'
+                  ? 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  : 'transform 0.5s ease',
+                outline: phase === 'result' && isPickedSlot
+                  ? `3px solid ${won ? 'var(--color-blood)' : 'var(--color-gray-bureau)'}`
+                  : 'none',
+                outlineOffset: '3px',
+                zIndex: phase === 'result' && isPickedSlot ? 2 : 1,
+                cursor: isPickable ? 'pointer' : 'default',
+              }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                handlePick(slot);
+              }}
+              role={isPickable ? 'button' : undefined}
+              tabIndex={isPickable ? 0 : undefined}
+              aria-label={isPickable ? `Select card ${slot + 1}` : undefined}
+            >
+              <div className={`monte-card ${isFlipped ? 'flipped' : ''}`}>
+                {/* Back */}
+                <div className="monte-card-face monte-card-back">
+                  <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/40 z-10">CLASSIFIED</div>
+                  <div className="text-white/20 text-2xl my-2 z-10">◆</div>
+                  <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-white/20 z-10">ISA-2024</div>
+                </div>
+                {/* Front */}
+                {isIsa ? (
+                  <div className="monte-card-face monte-card-front">
+                    <img src="/images/evidence03.jpg" alt="Subject ISA" />
+                  </div>
+                ) : (
+                  <div className="monte-card-face monte-card-front bg-paper flex flex-col items-center justify-center p-3">
+                    <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-gray-bureau mb-1">
+                      {cardId === 1 ? 'EXHIBIT X-7' : 'EXHIBIT X-9'}
+                    </div>
+                    <div className="text-3xl mb-1 opacity-30">◉</div>
+                    <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-ink/30">DECOY FILE</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {phase === 'result' && (
+        <div className="monte-result mt-6">
+          <div className={`font-mono text-[0.55rem] tracking-[0.2em] uppercase mb-4 ${won ? 'monte-result-win font-bold' : 'monte-result-lose'}`}>
+            {won
+              ? '▲ SUBJECT LOCATED — ISA WINS AGAIN ▲'
+              : '▲ SURVEILLANCE FAILURE — SUBJECT REMAINS AT LARGE ▲'}
+          </div>
+          <div className="flex gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => setPhase('intro')}
+              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink px-4 py-2 hover:bg-ink hover:text-white transition-colors duration-200 cursor-pointer"
+            >
+              SHUFFLE AGAIN
+            </button>
+            <button
+              onClick={onClose}
+              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink/30 text-ink/50 px-4 py-2 hover:border-ink hover:text-ink transition-colors duration-200 cursor-pointer"
+            >
+              RETURN TO FILE
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* Doctrine card stamp variations — different analysts handled different cards */
 const DOCTRINE_STAMPS = [
   'CONFIRMED',
@@ -331,6 +666,7 @@ const DOCTRINE_STAMPS = [
 
 export default function Home() {
   const heroRef = useScrollReveal();
+  const profileRef = useScrollReveal();
   const actIIRef = useScrollReveal();
   const actIIIRef = useScrollReveal();
   const actIVRef = useScrollReveal();
@@ -341,10 +677,17 @@ export default function Home() {
   const { count: declassifiedCount, increment: onDeclassify } = useDeclassificationCount();
   const { active: selfDestructActive, timeRemaining } = useSelfDestruct();
   const isIdle = useInactivityWarning();
+  const splash = useSplashScreen();
+  const scrollProgress = useScrollProgress();
+  const konami = useKonamiCode();
+  const [monteActive, setMonteActive] = useState(false);
 
   return (
     <main className="min-h-screen bg-bone">
       {/* ---- GLOBAL OVERLAYS ---- */}
+      <SplashScreen visible={splash.visible} opening={splash.opening} stampVisible={splash.stampVisible} onSkip={splash.skip} />
+      <ScrollProgressBar progress={scrollProgress} />
+      <KonamiLockdown active={konami.activated} onDismiss={konami.dismiss} />
       <div className="grain-overlay" aria-hidden="true" />
       <div className="scanlines" aria-hidden="true" />
       <PageCounter section={section} />
@@ -359,7 +702,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* META HEADER BAR */}
       {/* ============================================= */}
-      <div className="bg-ink text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm bg-ink/95">
+      <div className="bg-ink/95 text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm">
         <span>Classification: <span className="text-crayon-red font-bold">CULTURAL EMERGENCY</span></span>
         <span className="flex items-center gap-3">
           <DeclassificationBadge count={declassifiedCount} />
@@ -457,7 +800,9 @@ export default function Home() {
               <img
                 src="/images/evidence01.jpg"
                 alt="Primary subject identification — classified evidence photograph"
-                className="w-full block"
+                className="w-full h-auto block"
+                width={768}
+                height={1360}
                 loading="eager"
                 decoding="async"
                 fetchPriority="high"
@@ -500,13 +845,85 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Angled divider into Act II */}
+      {/* Angled divider into Profile */}
       <div className="section-divider mx-4" />
 
       {/* ============================================= */}
-      {/* ACT II — WHAT IS ISA FASCISM? */}
+      {/* ACT II — SUBJECT PROFILE DOSSIER */}
       {/* ============================================= */}
-      <section ref={(el) => { actIIRef.current = el; registerSection(1)(el); }} className="px-4 py-16 md:py-24 relative">
+      <section ref={(el) => { profileRef.current = el; registerSection(1)(el); }} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
+        <div className="classified-watermark" aria-hidden="true" />
+        <div className="coffee-stain" style={{ top: '5%', right: '3%' }} aria-hidden="true" />
+
+        {/* Margin note */}
+        <div className="margin-note" style={{ left: '-8px', top: '40%' }} aria-hidden="true">
+          ANALYST 4 — FLAGGED FOR REVIEW — 04/2024
+        </div>
+
+        <div className="max-w-2xl mx-auto relative z-10">
+          <div className="dossier-tab mb-8 reveal">
+            Section II &nbsp;/&nbsp; Subject Profile &nbsp;/&nbsp; PERSONNEL FILE
+          </div>
+
+          <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-8 reveal delay-1">
+            Subject<br />
+            <span className="text-blood font-display text-4xl md:text-6xl">Dossier</span>
+          </h2>
+
+          <div className="subject-profile p-0 mb-10 reveal delay-2">
+            <div className="pt-10 px-6 pb-6 md:px-8 md:pb-8">
+              <div className="space-y-0">
+                <div className="profile-row">
+                  <span className="profile-label">Designation</span>
+                  <span className="profile-value font-bold">ISA (Primary Subject)</span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Known Aliases</span>
+                  <span className="profile-value">&quot;The Fascist,&quot; &quot;Her,&quot; <RedactedText onDeclassify={onDeclassify}>that bitch (affectionate)</RedactedText></span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Threat Level</span>
+                  <span className="profile-value text-blood font-bold">UNCONTAINABLE</span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Distinguishing Marks</span>
+                  <span className="profile-value">Moth tattoo(s). Number unknown — believed to be multiplying.</span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Last Known Location</span>
+                  <span className="profile-value"><FailedRedaction>brunch</FailedRedaction></span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Known Associates</span>
+                  <span className="profile-value"><RedactedText onDeclassify={onDeclassify}>the group chat</RedactedText> — all currently under surveillance</span>
+                </div>
+                <div className="profile-row">
+                  <span className="profile-label">Behavioral Pattern</span>
+                  <span className="profile-value">Oscillates between &quot;I love everyone&quot; and restructuring all social hierarchies within a 50-foot radius</span>
+                </div>
+                <div className="profile-row border-b-0">
+                  <span className="profile-label">Analyst Note</span>
+                  <span className="profile-value italic text-gray-bureau">&quot;I don&rsquo;t know how to explain this but she&rsquo;s right about everything and that&rsquo;s the problem.&quot; — <RedactedText onDeclassify={onDeclassify}>Field Agent 12</RedactedText></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center reveal delay-3">
+            <div className="stamp inline-block">
+              FILE ACTIVE
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Warning stripe */}
+      <div className="warning-stripe-thin h-2 w-full" aria-hidden="true" />
+
+      {/* ============================================= */}
+      {/* ACT III — WHAT IS ISA FASCISM? */}
+      {/* ============================================= */}
+      <section ref={(el) => { actIIRef.current = el; registerSection(2)(el); }} className="px-4 py-16 md:py-24 relative">
         {/* Classified watermark */}
         <div className="classified-watermark" aria-hidden="true" />
         {/* Coffee stain */}
@@ -516,7 +933,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto relative z-10">
           {/* Section metadata */}
           <div className="dossier-tab mb-8 reveal">
-            Section II &nbsp;/&nbsp; Threat Analysis &nbsp;/&nbsp; Page 2 of 6
+            Section III &nbsp;/&nbsp; Threat Analysis &nbsp;/&nbsp; Page 3 of 7
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-8 reveal delay-1">
@@ -551,6 +968,28 @@ export default function Home() {
             ))}
           </div>
 
+          {/* INCIDENT TIMELINE */}
+          <div className="mt-12 mb-10">
+            <div className="font-mono text-[0.55rem] tracking-[0.2em] uppercase text-gray-bureau mb-6 reveal delay-5">
+              ▸ DOCUMENTED INCIDENTS (PARTIAL LIST — <RedactedText onDeclassify={onDeclassify}>47 ADDITIONAL ENTRIES</RedactedText> WITHHELD)
+            </div>
+            <div className="incident-timeline space-y-0">
+              {[
+                { date: 'FEB 2024', code: 'INC-017', title: 'The Seating Chart Reorganization', desc: 'Subject rearranged entire friend group dinner seating based on "vibes" and "emotional proximity scores." Three friendships were restructured. No appeals were filed because no one knew they could.' },
+                { date: 'MAR 2024', code: 'INC-023', title: 'The Iced Coffee Incident (Super Bowl)', desc: 'Subject arrived at Super Bowl party with iced coffee. In February. Demanded others acknowledge this as "a lifestyle, not a beverage choice." The room complied.' },
+                { date: 'APR 2024', code: 'INC-031', title: 'Moth Tattoo Recruitment Drive', desc: 'Subject convinced two (2) previously unaffiliated civilians to get moth tattoos. Method of persuasion remains classified. Subjects reported feeling "inspired" and "slightly confused."' },
+                { date: 'MAY 2024', code: 'INC-038', title: 'The 7 AM Thrifting Mandate', desc: 'Subject texted group chat at 6:47 AM: "thrifting in 13 minutes who\'s coming." Four people were in the car by 7:02. No one remembers agreeing.' },
+              ].map((incident, i) => (
+                <div key={incident.code} className={`incident-item reveal delay-${i + 5}`}>
+                  <div className="incident-dot" />
+                  <div className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-blood font-bold mb-1">{incident.date} — {incident.code}</div>
+                  <div className="font-headline text-sm font-bold mb-1">{incident.title}</div>
+                  <p className="font-body text-sm text-ink/70 leading-relaxed">{incident.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="text-center reveal delay-7">
             <div className="stamp inline-block">
               ANALYSIS COMPLETE
@@ -565,14 +1004,14 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT III — RECOVERED DOCTRINES / EVIDENCE */}
       {/* ============================================= */}
-      <section ref={(el) => { actIIIRef.current = el; registerSection(2)(el); }} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
+      <section ref={(el) => { actIIIRef.current = el; registerSection(3)(el); }} className="px-4 py-16 md:py-24 bg-paper paper-texture relative">
         {/* Coffee stain */}
         <div className="coffee-stain" style={{ top: '3%', left: '8%' }} aria-hidden="true" />
         <div className="coffee-stain coffee-stain-sm" style={{ bottom: '20%', right: '6%' }} aria-hidden="true" />
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="dossier-tab mb-6 reveal">
-            Section III &nbsp;/&nbsp; Recovered Doctrines &nbsp;/&nbsp; Evidence of Spread
+            Section IV &nbsp;/&nbsp; Recovered Doctrines &nbsp;/&nbsp; Evidence of Spread
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-4 reveal delay-1">
@@ -593,7 +1032,9 @@ export default function Home() {
                 <img
                   src="/images/evidence02.jpg"
                   alt="Subject observed during active doctrinal dissemination"
-                  className="w-full block"
+                  className="w-full h-auto block"
+                  width={1152}
+                  height={2048}
                   loading="lazy"
                   decoding="async"
                 />
@@ -681,13 +1122,13 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT IV — THE FIVE OPERATIONAL PILLARS */}
       {/* ============================================= */}
-      <section ref={(el) => { actIVRef.current = el; registerSection(3)(el); }} className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
+      <section ref={(el) => { actIVRef.current = el; registerSection(4)(el); }} className="px-4 py-16 md:py-28 bg-ink text-white relative overflow-hidden">
         {/* Grid bg */}
         <div className="footer-grid" aria-hidden="true" />
 
         <div className="max-w-3xl mx-auto relative z-10">
           <div className="font-mono text-[0.6rem] tracking-[0.25em] uppercase text-white/40 mb-6 reveal">
-            Section IV &nbsp;/&nbsp; Foundational Architecture &nbsp;/&nbsp; CLASSIFIED
+            Section V &nbsp;/&nbsp; Foundational Architecture &nbsp;/&nbsp; CLASSIFIED
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl lg:text-6xl font-black leading-[1.0] mb-4 reveal delay-1">
@@ -773,7 +1214,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT V — INEVITABILITY / CIVILIAN PREPAREDNESS */}
       {/* ============================================= */}
-      <section ref={(el) => { actVRef.current = el; registerSection(4)(el); }} className="px-4 py-16 md:py-24 relative">
+      <section ref={(el) => { actVRef.current = el; registerSection(5)(el); }} className="px-4 py-16 md:py-24 relative">
         {/* Classified watermark */}
         <div className="classified-watermark" aria-hidden="true" />
         {/* Coffee stain */}
@@ -781,7 +1222,7 @@ export default function Home() {
 
         <div className="max-w-2xl mx-auto relative z-10">
           <div className="dossier-tab mb-6 reveal">
-            Section V &nbsp;/&nbsp; Civilian Preparedness Memo &nbsp;/&nbsp; FINAL ADVISORY
+            Section VI &nbsp;/&nbsp; Civilian Preparedness Memo &nbsp;/&nbsp; FINAL ADVISORY
           </div>
 
           <h2 className="font-headline text-3xl md:text-5xl font-black leading-[1.05] mb-6 reveal delay-1">
@@ -832,48 +1273,81 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ---- IMAGE 3: FINAL EVIDENCE ---- */}
-          <div className="max-w-sm mx-auto mb-12 reveal-scale delay-2">
-            <div className="evidence-frame relative" style={{ transform: 'rotate(-1.5deg)' }}>
-              <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
-              <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
-              <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
-              <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
-              <div className="relative">
-                <img
-                  src="/images/evidence03.jpg"
-                  alt="Final-stage observation — subject in contemplative state"
-                  className="w-full block"
-                  loading="lazy"
-                  decoding="async"
-                />
-                {/* Crayon arrow */}
-                <div
-                  className="absolute top-[5%] left-[5%] font-mono text-[0.55rem] text-crayon-red font-bold"
-                  style={{ transform: 'rotate(-8deg)' }}
-                  aria-hidden="true"
-                >
-                  IT&rsquo;S TOO LATE ↓
+          {/* ---- IMAGE 3: FINAL EVIDENCE / THREE-CARD MONTE ---- */}
+          {!monteActive ? (
+            <div className="max-w-sm mx-auto mb-12 reveal-scale delay-2">
+              <div
+                className="evidence-frame evidence-glow relative"
+                style={{ transform: 'rotate(-1.5deg)' }}
+                onClick={() => setMonteActive(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setMonteActive(true); }}
+                aria-label="Open evidence shuffle protocol"
+              >
+                <div className="evidence-tape evidence-tape-tl" aria-hidden="true" />
+                <div className="evidence-tape evidence-tape-tr" aria-hidden="true" />
+                <div className="evidence-tape evidence-tape-br" aria-hidden="true" />
+                <div className="evidence-label mb-2">EXHIBIT C — FINAL-STAGE OBSERVATION</div>
+                <div className="relative">
+                  <img
+                    src="/images/evidence03.jpg"
+                    alt="Final-stage observation — subject in contemplative state"
+                    className="w-full h-auto block"
+                    width={1152}
+                    height={2048}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  {/* Crayon arrow */}
+                  <div
+                    className="absolute top-[5%] left-[5%] font-mono text-[0.55rem] text-crayon-red font-bold"
+                    style={{ transform: 'rotate(-8deg)' }}
+                    aria-hidden="true"
+                  >
+                    IT&rsquo;S TOO LATE ↓
+                  </div>
+                  {/* Evidence circle */}
+                  <div
+                    className="absolute bottom-[20%] left-[25%] w-[50%] h-[30%] border-[3px] border-crayon-blue rounded-[45%_50%_52%_48%] opacity-50 pointer-events-none"
+                    style={{ transform: 'rotate(4deg)' }}
+                    aria-hidden="true"
+                  />
                 </div>
-                {/* Evidence circle */}
-                <div
-                  className="absolute bottom-[20%] left-[25%] w-[50%] h-[30%] border-[3px] border-crayon-blue rounded-[45%_50%_52%_48%] opacity-50 pointer-events-none"
-                  style={{ transform: 'rotate(4deg)' }}
-                  aria-hidden="true"
-                />
+                <div className="mt-2 flex justify-between items-end">
+                  <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
+                    STATUS: <span className="text-blood font-bold">IRREVERSIBLE</span> &nbsp;/&nbsp; REF: ISA-FINAL
+                  </span>
+                  <span className="stamp text-[0.5rem] py-0.5 px-2 border-2" style={{ transform: 'rotate(-8deg)' }}>
+                    NO RETURN
+                  </span>
+                </div>
               </div>
-              <div className="mt-2 flex justify-between items-end">
-                <span className="font-mono text-[0.5rem] text-gray-bureau tracking-wider uppercase">
-                  STATUS: <span className="text-blood font-bold">IRREVERSIBLE</span> &nbsp;/&nbsp; REF: ISA-FINAL
-                </span>
-                <span className="stamp text-[0.5rem] py-0.5 px-2 border-2" style={{ transform: 'rotate(-8deg)' }}>
-                  NO RETURN
-                </span>
+            </div>
+          ) : (
+            <div className="max-w-md mx-auto mb-12 reveal-scale">
+              <div className="bg-white border-2 border-ink p-4 md:p-6 relative">
+                <div className="doc-crease top-[30%]" aria-hidden="true" />
+                <ThreeCardMonte onClose={() => setMonteActive(false)} />
               </div>
+            </div>
+          )}
+
+          {/* Analyst transfer request */}
+          <div className="mt-8 bg-paper border border-ink/20 p-4 reveal delay-4 relative">
+            <div className="doc-crease top-[60%]" aria-hidden="true" />
+            <div className="font-mono text-[0.5rem] tracking-[0.15em] uppercase text-gray-bureau mb-2">
+              INTERNAL MEMO — ANALYST TRANSFER REQUEST
+            </div>
+            <p className="font-body text-sm text-ink/60 italic leading-relaxed">
+              &quot;I am formally requesting transfer off this case. Not because the subject is dangerous — she is — but because I have been to <FailedRedaction>three brunches</FailedRedaction> as part of my surveillance duties and I think I&rsquo;m becoming <RedactedText onDeclassify={onDeclassify}>one of them</RedactedText>. I laughed at a core-core TikTok yesterday. Please advise.&quot;
+            </p>
+            <div className="font-mono text-[0.45rem] tracking-[0.1em] uppercase text-ink/30 mt-2">
+              — <RedactedText onDeclassify={onDeclassify}>AGENT WILLIAMS</RedactedText>, CULTURAL AFFAIRS DIVISION
             </div>
           </div>
 
-          <div className="text-center reveal delay-4">
+          <div className="text-center mt-8 reveal delay-5">
             <p className="font-headline text-lg md:text-xl italic text-ink/60">
               You have been informed.
             </p>
@@ -884,7 +1358,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* ACT VI — FOOTER / ISSUING BODY */}
       {/* ============================================= */}
-      <footer ref={(el) => { footerRef.current = el; registerSection(5)(el); }} className="bg-ink text-white px-4 py-20 md:py-28 relative overflow-hidden">
+      <footer ref={(el) => { footerRef.current = el; registerSection(6)(el); }} className="bg-ink text-white px-4 py-20 md:py-28 relative overflow-hidden">
         {/* Grid lines */}
         <div className="footer-grid" aria-hidden="true" />
 
@@ -928,6 +1402,19 @@ export default function Home() {
             <p className="font-mono text-[0.45rem] tracking-[0.15em] uppercase text-white/20 leading-loose">
               DISTRIBUTION: <RedactedText onDeclassify={onDeclassify}>THE GROUP CHAT</RedactedText>, <RedactedText onDeclassify={onDeclassify}>EVERYONE AT BRUNCH</RedactedText>, <RedactedText onDeclassify={onDeclassify}>HER MOM (ACCIDENTALLY)</RedactedText>, AND UNFORTUNATELY, THE GENERAL PUBLIC
             </p>
+          </div>
+
+          {/* Appendix references */}
+          <div className="mt-8 text-left max-w-xs mx-auto reveal delay-3">
+            <div className="font-mono text-[0.45rem] tracking-[0.15em] uppercase text-white/25 mb-3">APPENDICES (AVAILABLE UPON REQUEST):</div>
+            <div className="space-y-1.5 font-mono text-[0.4rem] tracking-[0.1em] uppercase text-white/15 leading-relaxed">
+              <div>APPENDIX A: Iced Coffee Incident Report (47 pages)</div>
+              <div>APPENDIX B: Moth Tattoo Registry &amp; Recruitment Logs</div>
+              <div>APPENDIX C: Thrifting Acquisition Manifest (ongoing)</div>
+              <div>APPENDIX D: Emotional Outburst Transcript (312 pages, <span className="text-blood/30">TRIGGER WARNING</span>)</div>
+              <div>APPENDIX E: Playlist Analysis — Psychological Profile</div>
+              <div>APPENDIX F: <RedactedText onDeclassify={onDeclassify}>Brunch Surveillance Logs</RedactedText></div>
+            </div>
           </div>
 
           {/* DOCUMENT REVIEWED IN FULL stamp — only appears when reader reaches footer */}
