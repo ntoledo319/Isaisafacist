@@ -1269,19 +1269,32 @@ section:not(:first-of-type) {
 }
 
 /* ---- THREE-CARD MONTE ---- */
+/* ---- THREE-CARD MONTE ---- */
 .monte-game {
   position: relative;
-  max-width: 400px;
+  max-width: 420px;
   margin: 0 auto;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
+.monte-header-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--color-ink) 20%, var(--color-ink) 80%, transparent 100%);
+  opacity: 0.2;
+}
+
+.monte-result-rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--color-ink) 30%, var(--color-ink) 70%, transparent 100%);
+  opacity: 0.15;
+  margin: 0 2rem;
+}
+
 .monte-table {
-  perspective: 900px;
-  padding: 16px 0;
-  /* 3 cards: 3×100 + 2×12 gap = 324px, or 3×120 + 2×20 = 400px */
+  perspective: 1000px;
+  padding: 20px 0;
   width: min(324px, 100%);
   margin-left: auto;
   margin-right: auto;
@@ -1289,7 +1302,7 @@ section:not(:first-of-type) {
 
 @media (min-width: 640px) {
   .monte-table {
-    width: 400px;
+    width: 420px;
   }
 }
 
@@ -1301,13 +1314,26 @@ section:not(:first-of-type) {
   left: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  perspective: 600px;
+  perspective: 700px;
+}
+
+.monte-slot-pickable {
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+
+.monte-slot-pickable:hover {
+  filter: drop-shadow(0 6px 16px rgba(196, 30, 30, 0.2));
+  transform: scale(1.03);
+}
+
+.monte-slot-shuffling {
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.25));
 }
 
 @media (min-width: 640px) {
   .monte-slot {
-    width: 120px;
-    height: 168px;
+    width: 125px;
+    height: 175px;
   }
 }
 
@@ -1330,48 +1356,139 @@ section:not(:first-of-type) {
   -webkit-backface-visibility: hidden;
   border: 2px solid var(--color-ink);
   overflow: hidden;
+  border-radius: 3px;
 }
 
+/* Card back — government classified look */
 .monte-card-back {
   background: var(--color-ink);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 8px,
+      rgba(255,255,255,0.02) 8px,
+      rgba(255,255,255,0.02) 9px
+    );
 }
 
 .monte-card-back::before {
   content: '';
   position: absolute;
-  inset: 6px;
-  border: 1px solid rgba(255,255,255,0.15);
+  inset: 5px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 1px;
 }
 
 .monte-card-back::after {
   content: '';
   position: absolute;
-  inset: 10px;
-  border: 1px dashed rgba(255,255,255,0.08);
+  inset: 9px;
+  border: 1px dashed rgba(255,255,255,0.07);
 }
 
+.monte-card-seal {
+  color: rgba(255,255,255,0.12);
+  font-size: 2.5rem;
+  z-index: 10;
+  line-height: 1;
+}
+
+.monte-card-stripe {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(196, 30, 30, 0.25) 0px,
+    rgba(196, 30, 30, 0.25) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+/* Card front — subject */
 .monte-card-front {
   transform: rotateY(180deg);
-  background: white;
+  background: var(--color-paper);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.monte-card-front img {
+.monte-card-front-isa {
+  position: relative;
+}
+
+.monte-card-front-isa img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
+.monte-card-stamp {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  font-family: var(--font-mono);
+  font-size: 0.45rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-blood);
+  border: 1.5px solid var(--color-blood);
+  padding: 1px 6px;
+  background: rgba(255,255,255,0.85);
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
+/* Card front — decoy */
+.monte-card-front-decoy {
+  flex-direction: column;
+  position: relative;
+}
+
+.monte-decoy-redacted {
+  position: absolute;
+  top: 25%;
+  left: 15%;
+  right: 15%;
+  height: 18%;
+  background: var(--color-ink);
+  opacity: 0.08;
+}
+
+.monte-decoy-icon {
+  font-size: 1.8rem;
+  color: var(--color-ink);
+  opacity: 0.12;
+  line-height: 1;
+  margin: 0.25rem 0;
+  z-index: 10;
+}
+
+/* Picking phase pulse */
+@keyframes montePulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.monte-picking-pulse {
+  animation: montePulse 1.2s ease-in-out infinite;
+}
+
 /* Result styling */
 .monte-result {
   text-align: center;
-  padding: 1rem 0;
+  padding: 0.75rem 0;
 }
 
 .monte-result-win {
@@ -1380,6 +1497,39 @@ section:not(:first-of-type) {
 
 .monte-result-lose {
   color: var(--color-gray-bureau);
+}
+
+/* Buttons */
+.monte-btn {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.monte-btn-primary {
+  border: 1.5px solid var(--color-ink);
+  color: var(--color-ink);
+  background: transparent;
+}
+
+.monte-btn-primary:hover {
+  background: var(--color-ink);
+  color: white;
+}
+
+.monte-btn-secondary {
+  border: 1.5px solid rgba(0,0,0,0.2);
+  color: rgba(0,0,0,0.4);
+  background: transparent;
+}
+
+.monte-btn-secondary:hover {
+  border-color: var(--color-ink);
+  color: var(--color-ink);
 }
 
 /* Evidence photo glow pulse to invite clicking */

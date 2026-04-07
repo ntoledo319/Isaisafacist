@@ -478,6 +478,9 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
 
   const getSlotX = useCallback((slot: number) => slot * slotWidth, [slotWidth]);
 
+  // Track consecutive losses for escalating desperation
+  const lossStreak = useRef(0);
+
   const startGame = useCallback(async () => {
     alive.current = true;
 
@@ -489,44 +492,76 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
     setPicked(null);
     setWon(false);
 
-    // Show faces
+    // Show faces — briefer reveal after first game
     setPhase('reveal');
     setShowFaces(true);
-    await sleep(2200);
+    await sleep(lossStreak.current === 0 ? 2000 : 1400);
     if (!alive.current) return;
 
     // Flip back down
     setShowFaces(false);
-    await sleep(700);
+    await sleep(600);
     if (!alive.current) return;
 
-    // Shuffle: 6-9 swaps
+    // Phase 1: Slow deliberate shuffles to build false confidence
     setPhase('shuffling');
-    const numSwaps = 6 + Math.floor(Math.random() * 4);
     const cur: [number, number, number] = [...init];
 
-    for (let i = 0; i < numSwaps; i++) {
+    const doSwap = (a: number, b: number) => {
+      const tmp = cur[a]; cur[a] = cur[b]; cur[b] = tmp;
+      setCardSlots([...cur]);
+    };
+
+    // 2-3 slow "easy to follow" swaps
+    const slowSwaps = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < slowSwaps; i++) {
       if (!alive.current) return;
-      // Pick two cards to swap slots
       const a = Math.floor(Math.random() * 3);
       let b = a;
       while (b === a) b = Math.floor(Math.random() * 3);
-      const tmp = cur[a]; cur[a] = cur[b]; cur[b] = tmp;
-      setCardSlots([...cur]);
-      await sleep(Math.max(280, 520 - i * 30));
+      doSwap(a, b);
+      await sleep(600);
     }
 
-    // Rig: 75% chance we do one extra swap moving Isa to confuse
-    if (Math.random() > 0.25) {
+    // Phase 2: Rapid burst — 8-12 fast swaps, accelerating
+    const burstSwaps = 8 + Math.floor(Math.random() * 5);
+    for (let i = 0; i < burstSwaps; i++) {
+      if (!alive.current) return;
+      const a = Math.floor(Math.random() * 3);
+      let b = a;
+      while (b === a) b = Math.floor(Math.random() * 3);
+      doSwap(a, b);
+      await sleep(Math.max(140, 350 - i * 20));
+    }
+
+    // Phase 3: False pause — player thinks it's over, then 2-3 more rapid swaps
+    if (!alive.current) return;
+    await sleep(400);
+    const sucker = 2 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < sucker; i++) {
+      if (!alive.current) return;
+      const a = Math.floor(Math.random() * 3);
+      let b = a;
+      while (b === a) b = Math.floor(Math.random() * 3);
+      doSwap(a, b);
+      await sleep(160);
+    }
+
+    // Rig: 88% chance we silently relocate Isa to a non-obvious slot
+    // (gives ~12% base win rate — hard but not impossible)
+    if (Math.random() > 0.12) {
       if (!alive.current) return;
       const isaAt = cur[ISA];
       const others = [0, 1, 2].filter(s => s !== isaAt);
       const target = others[Math.floor(Math.random() * others.length)];
-      // Find which card is at target slot
       const otherCard = cur.indexOf(target);
-      const tmp = cur[ISA]; cur[ISA] = cur[otherCard]; cur[otherCard] = tmp;
+      doSwap(ISA, otherCard);
+      await sleep(150);
+      // Extra misdirection: one more decoy swap so the rig isn't the last move
+      const d1 = 1, d2 = 2;
+      const tmpD = cur[d1]; cur[d1] = cur[d2]; cur[d2] = tmpD;
       setCardSlots([...cur]);
-      await sleep(380);
+      await sleep(180);
     }
 
     if (!alive.current) return;
@@ -545,28 +580,66 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
   const handlePick = useCallback((slot: number) => {
     if (phase !== 'picking') return;
     setPicked(slot);
-    setWon(cardSlots[ISA] === slot);
+    const didWin = cardSlots[ISA] === slot;
+    setWon(didWin);
+    if (didWin) {
+      lossStreak.current = 0;
+    } else {
+      lossStreak.current += 1;
+    }
     setShowFaces(true);
     setPhase('result');
   }, [phase, cardSlots]);
 
+  // Escalating loss messages
+  const lossMessages = [
+    'SURVEILLANCE FAILURE — SUBJECT REMAINS AT LARGE',
+    'REPEATED FAILURE — PERFORMANCE REVIEW INITIATED',
+    'CONTINUED INCOMPETENCE — SECURITY CLEARANCE UNDER REVIEW',
+    'PATTERN OF FAILURE — REASSIGNMENT TO DESK DUTY RECOMMENDED',
+    'AGENT DEEMED UNFIT — FILING INCIDENT REPORT №' + Math.floor(Math.random() * 9000 + 1000),
+  ];
+
+  const shuffleMessages = [
+    'Tracking in progress...',
+    'Evidence reclassification underway...',
+    'Shuffling exhibits per Protocol 7-B...',
+    'Chain of custody transfer in progress...',
+  ];
+
+  const shuffleMsg = useRef(shuffleMessages[Math.floor(Math.random() * shuffleMessages.length)]);
+  // Refresh shuffle message each game
+  useEffect(() => {
+    if (phase === 'intro') {
+      shuffleMsg.current = shuffleMessages[Math.floor(Math.random() * shuffleMessages.length)];
+    }
+  }, [phase]);
+
   return (
     <div className="monte-game">
-      <div className="text-center mb-4">
-        <div className="font-mono text-[0.5rem] tracking-[0.2em] uppercase text-gray-bureau mb-1">
-          CLASSIFIED — EVIDENCE SHUFFLE PROTOCOL
+      {/* Header */}
+      <div className="text-center mb-5">
+        <div className="monte-header-rule" />
+        <div className="font-mono text-[0.45rem] tracking-[0.3em] uppercase text-gray-bureau mb-1 mt-3">
+          DEPT. OF SURVEILLANCE — EVIDENCE SHUFFLE PROTOCOL
         </div>
         <div className="font-headline text-base md:text-xl font-bold text-ink leading-snug">
           {phase === 'intro' && 'Initializing shuffle protocol...'}
-          {phase === 'reveal' && 'Observe. Remember the subject.'}
-          {phase === 'shuffling' && 'Tracking in progress...'}
-          {phase === 'picking' && 'Select a card, agent.'}
-          {phase === 'result' && (won ? 'Congratulations, Isa wins!' : 'Congratulations, you win nothing!')}
+          {phase === 'reveal' && 'MEMORIZE THE SUBJECT\'S POSITION.'}
+          {phase === 'shuffling' && shuffleMsg.current}
+          {phase === 'picking' && 'Identify the subject, agent.'}
+          {phase === 'result' && (won ? 'Subject positively identified.' : 'Identification failed.')}
         </div>
+        {phase === 'picking' && (
+          <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-blood/60 mt-1 monte-picking-pulse">
+            ● AWAITING INPUT
+          </div>
+        )}
+        <div className="monte-header-rule mt-3" />
       </div>
 
       {/* Card table — relative container, cards absolutely positioned */}
-      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 168 : slotWidth >= 102 ? 126 : 112 }}>
+      <div className="monte-table relative" style={{ height: slotWidth >= 140 ? 178 : slotWidth >= 102 ? 136 : 118 }}>
         {[0, 1, 2].map((cardId) => {
           const slot = cardSlots[cardId];
           const isFlipped = showFaces;
@@ -577,16 +650,16 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
           return (
             <div
               key={`card-${cardId}`}
-              className="monte-slot"
+              className={`monte-slot ${isPickable ? 'monte-slot-pickable' : ''} ${phase === 'shuffling' ? 'monte-slot-shuffling' : ''}`}
               style={{
                 transform: `translateX(${getSlotX(slot)}px)`,
                 transition: phase === 'shuffling'
-                  ? 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+                  ? 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1)'
                   : 'transform 0.5s ease',
                 outline: phase === 'result' && isPickedSlot
                   ? `3px solid ${won ? 'var(--color-blood)' : 'var(--color-gray-bureau)'}`
                   : 'none',
-                outlineOffset: '3px',
+                outlineOffset: '4px',
                 zIndex: phase === 'result' && isPickedSlot ? 2 : 1,
                 cursor: isPickable ? 'pointer' : 'default',
               }}
@@ -601,22 +674,27 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
               <div className={`monte-card ${isFlipped ? 'flipped' : ''}`}>
                 {/* Back */}
                 <div className="monte-card-face monte-card-back">
-                  <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-white/40 z-10">CLASSIFIED</div>
-                  <div className="text-white/20 text-2xl my-2 z-10">◆</div>
-                  <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-white/20 z-10">ISA-2024</div>
+                  <div className="monte-card-seal">◆</div>
+                  <div className="font-mono text-[0.35rem] tracking-[0.25em] uppercase text-white/50 z-10 mt-1">CLASSIFIED</div>
+                  <div className="monte-card-stripe" />
+                  <div className="font-mono text-[0.3rem] tracking-[0.15em] uppercase text-white/20 z-10 absolute bottom-2">
+                    FILE ISA-{2024 + cardId}
+                  </div>
                 </div>
                 {/* Front */}
                 {isIsa ? (
-                  <div className="monte-card-face monte-card-front">
+                  <div className="monte-card-face monte-card-front monte-card-front-isa">
                     <img src="/images/evidence03.jpg" alt="Subject ISA" />
+                    <div className="monte-card-stamp">SUBJECT</div>
                   </div>
                 ) : (
-                  <div className="monte-card-face monte-card-front bg-paper flex flex-col items-center justify-center p-3">
-                    <div className="font-mono text-[0.4rem] tracking-[0.15em] uppercase text-gray-bureau mb-1">
+                  <div className="monte-card-face monte-card-front monte-card-front-decoy">
+                    <div className="monte-decoy-redacted" />
+                    <div className="font-mono text-[0.35rem] tracking-[0.2em] uppercase text-gray-bureau mb-0.5 z-10">
                       {cardId === 1 ? 'EXHIBIT X-7' : 'EXHIBIT X-9'}
                     </div>
-                    <div className="text-3xl mb-1 opacity-30">◉</div>
-                    <div className="font-mono text-[0.35rem] tracking-[0.1em] uppercase text-ink/30">DECOY FILE</div>
+                    <div className="monte-decoy-icon">▧</div>
+                    <div className="font-mono text-[0.3rem] tracking-[0.1em] uppercase text-ink/25 z-10">NO MATCH</div>
                   </div>
                 )}
               </div>
@@ -627,21 +705,32 @@ function ThreeCardMonte({ onClose }: { onClose: () => void }) {
 
       {phase === 'result' && (
         <div className="monte-result mt-6">
-          <div className={`font-mono text-[0.55rem] tracking-[0.2em] uppercase mb-4 ${won ? 'monte-result-win font-bold' : 'monte-result-lose'}`}>
+          <div className={`font-mono text-[0.5rem] tracking-[0.2em] uppercase mb-1 ${won ? 'monte-result-win font-bold' : 'monte-result-lose'}`}>
             {won
-              ? '▲ SUBJECT LOCATED — ISA WINS AGAIN ▲'
-              : '▲ SURVEILLANCE FAILURE — SUBJECT REMAINS AT LARGE ▲'}
+              ? '▲ SUBJECT LOCATED — ISA IDENTIFIED ▲'
+              : `▲ ${lossMessages[Math.min(lossStreak.current - 1, lossMessages.length - 1)]} ▲`}
           </div>
-          <div className="flex gap-3 justify-center flex-wrap">
+          {!won && lossStreak.current >= 3 && (
+            <div className="font-mono text-[0.4rem] tracking-[0.15em] text-blood/50 mb-3">
+              CONSECUTIVE FAILURES: {lossStreak.current}
+            </div>
+          )}
+          {won && (
+            <div className="font-mono text-[0.4rem] tracking-[0.15em] text-ink/40 mb-3">
+              Even a broken clock is right twice a day.
+            </div>
+          )}
+          <div className="monte-result-rule" />
+          <div className="flex gap-3 justify-center flex-wrap mt-4">
             <button
               onClick={() => setPhase('intro')}
-              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink px-4 py-2 hover:bg-ink hover:text-white transition-colors duration-200 cursor-pointer"
+              className="monte-btn monte-btn-primary"
             >
-              SHUFFLE AGAIN
+              RE-INITIATE PROTOCOL
             </button>
             <button
               onClick={onClose}
-              className="font-mono text-[0.55rem] tracking-[0.15em] uppercase border border-ink/30 text-ink/50 px-4 py-2 hover:border-ink hover:text-ink transition-colors duration-200 cursor-pointer"
+              className="monte-btn monte-btn-secondary"
             >
               RETURN TO FILE
             </button>
