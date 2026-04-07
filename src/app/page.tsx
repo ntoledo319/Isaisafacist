@@ -887,7 +887,7 @@ export default function Home() {
                 </div>
                 <div className="profile-row">
                   <span className="profile-label">Distinguishing Marks</span>
-                  <span className="profile-value">Moth tattoo(s). Number unknown — believed to be multiplying.</span>
+                  <span className="profile-value">Disposable Vapes and generally flowy clothing</span>
                 </div>
                 <div className="profile-row">
                   <span className="profile-label">Last Known Location</span>
