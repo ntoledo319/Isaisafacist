@@ -45,7 +45,7 @@ function useScrollReveal() {
   return ref;
 }
 
-/** Tracks which section (1-6) the reader is currently viewing */
+/** Tracks which section (1-7) the reader is currently viewing */
 function useCurrentSection() {
   const [section, setSection] = useState(1);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
@@ -205,11 +205,12 @@ function useScrollProgress() {
 }
 
 /** Konami code easter egg — ↑↑↓↓←→←→BA */
+const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'] as const;
+
 function useKonamiCode() {
   const [activated, setActivated] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const sequence = useRef<string[]>([]);
-  const KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -701,7 +702,7 @@ export default function Home() {
       {/* ============================================= */}
       {/* META HEADER BAR */}
       {/* ============================================= */}
-      <div className="bg-ink text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm bg-ink/95">
+      <div className="bg-ink/95 text-white px-4 py-2 flex justify-between items-center font-mono text-[0.6rem] tracking-[0.2em] uppercase sticky top-0 z-50 backdrop-blur-sm">
         <span>Classification: <span className="text-crayon-red font-bold">CULTURAL EMERGENCY</span></span>
         <span className="flex items-center gap-3">
           <DeclassificationBadge count={declassifiedCount} />
